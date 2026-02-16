@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Reporthub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <link rel="stylesheet" href="static/styles.css">
+
+</head>
+
+<body>
+
+  <div class="top-bg"></div>
+
+  <div class="app">
+    <div class="main-row">
+
+      <!-- LEFT -->
+      <div class="left-panel">
+        <div class="top-bar">
+          <div class="logo">
+            <span>Report</span><span>hub</span>
+          </div>
+
+          <div class="segmented">
+            <div id="segmented-slider" class="selection-slider"></div>
+            <button class="active">Daily</button>
+            <button>2-Weekly</button>
+            <button>Common</button>
+          </div>
+
+          <button class="search-btn">Search History</button>
+        </div>
+
+        <div id="whiteboard" class="whiteboard">
+          <h3 class="whiteboard-header">
+            <div class="header-left">
+              <span class="icon">📝</span>
+              <span>Daily Activities Report - February 06, 2026</span>
+            </div>
+
+            <div class="header-buttons">
+              <button id="btn-import">Import</button>
+              <button id="btn-export">Export</button>
+              <button id="btn-send">Send to Real Report</button>
+              <button id="btn-attach">Attach Image</button>
+              <button id="btn-save">Save</button>
+            </div>
+          </h3>
+
+          <div class="whiteboard-content" contenteditable="true" id="editor">
+            <div id="li-highlighter" class="li-highlighter"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div class="right-panel">
+        <div class="right-header">
+          <span>Engine Department</span>
+          <span>⚙</span>
+        </div>
+
+        <div class="widget calendar">
+          <div class="cal-header">
+            <button id="prevMonth">◀</button>
+            <span id="monthYear"></span>
+            <button id="nextMonth">▶</button>
+          </div>
+          <div class="cal-weekdays">
+            <span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span>
+          </div>
+          <div id="calendarGrid" class="cal-grid"></div>
+        </div>
+
+        <div class="widget image-bucket">
+          <div class="image-bucket-header">
+            Image Bucket
+          </div>
+          <div class="image-bucket-content">
+            <div id="qrcode-canvas">
+              <div id="qrcode-canvas" style="padding: 10px; background: white; border-radius: 4px;"></div>
+            </div>
+          </div>
+          <div class="image-bucket-footer">
+            Scan to upload or attach your job related images
+          </div>
+        </div>
+        <div class="widget image-stream">
+          <img id="streamImage" src="http://192.168.10.100:8888/get-latest-image" alt="image Stream">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="custom-context-menu"
+    style="display: none; position: absolute; z-index: 10000; background: white; border: 1px solid #ccc; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); border-radius: 4px; padding: 5px 0; min-width: 180px;">
+    <div id="attach-image-item"
+      style="padding: 8px 15px; cursor: pointer; font-size: 14px; transition: background 0.2s;">
+      Attach Image from Bucket
+    </div>
+  </div>
+
+  <div id="snackbar">Report Saved!</div>
+
+  <div id="gallery-modal">
+    <div class="gallery-container">
+      <header class="gallery-header">
+        <h3>Image Bucket Explorer</h3>
+        <button class="close-btn">&times;</button>
+      </header>
+
+      <div class="gallery-body">
+        <aside class="gallery-sidebar">
+          <div class="sidebar-label">Report Periods</div>
+          <div id="folder-list">
+          </div>
+        </aside>
+
+        <main class="gallery-content">
+          <div id="image-grid" class="image-grid">
+          </div>
+        </main>
+      </div>
+
+      <footer class="gallery-footer">
+        <div id="selection-status" style="font-weight: 600; color: #64748b;">0 images selected</div>
+        <div class="footer-actions">
+          <button class="btn-base btn-copy">Copy Links</button>
+          <button class="btn-base btn-delete">Delete</button>
+          <button class="btn-base btn-attach">Attach to Report</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <div id="decision-modal" class="modal-overlay">
+    <div class="decision-card">
+      <h3>Image Removal</h3>
+      <p>Paano mo gustong tangalin ito?</p>
+      <div class="decision-actions">
+        <button id="btn-detach-confirm" class="btn-secondary">Detach from Report</button>
+        <button id="btn-delete-confirm" class="btn-danger">Delete from Server</button>
+        <button id="btn-cancel-confirm" class="btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="file-picker" style="display:none">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuidv4.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode_js@1.0.0/qrcode.min.js"></script>
+  <script type="module" src="/static/scripts/main.js"></script>
+
+</body>
+
+</html>

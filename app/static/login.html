@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ReportHub | Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* 1. GLOBAL & THEME */
+    :root {
+      --brand-blue: #e5f3ff;
+      --dark-navy: #36618e;
+      --error-bg: #f8d7da;
+      --error-text: #721c24;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, #81bef0, #48a0e7 70%);
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* 2. LOGIN CARD */
+    .login-shell {
+      width: 100%;
+      max-width: 460px;
+      background: rgba(255, 255, 255, 0.98);
+      padding: 42px 36px;
+      border-radius: 12px;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, .4);
+      animation: fadeIn 0.6s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo {
+      text-align: center;
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 32px;
+    }
+    .logo span:first-child { color: #0f172a; }
+    .logo span:last-child {
+      background: var(--dark-navy);
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 8px;
+      margin-left: 4px;
+    }
+
+    .field { margin-bottom: 24px; }
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* 3. SEGMENTED CONTROL */
+    .segmented {
+      display: flex;
+      background: #f1f1f1;
+      border-radius: 10px;
+      padding: 4px;
+      position: relative;
+      width: 100%;
+      height: 40px;
+    }
+
+    .segmented button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--dark-navy);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      z-index: 2;
+      transition: color 0.3s ease;
+    }
+
+    .segmented button.active { color: white; }
+
+    .selection-slider {
+      position: absolute;
+      top: 4px; left: 4px; bottom: 4px;
+      width: calc(25% - 2px); /* 4 buttons = 25% each */
+      background: var(--dark-navy);
+      border-radius: 7px;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 1;
+    }
+
+    /* 4. INPUTS & BUTTONS */
+    input[type="password"] {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      font-size: 16px;
+      transition: all 0.2s;
+    }
+    input:focus {
+      border-color: var(--brand-blue);
+      outline: none;
+      box-shadow: 0 0 0 4px rgba(72, 160, 231, 0.15);
+    }
+
+    .btn-signin {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      background: #48a0e7;
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(54, 97, 142, 0.3);
+      transition: all 0.2s;
+    }
+    .btn-signin:hover { transform: translateY(-1px); filter: brightness(1.1); }
+
+    .error {
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      text-align: center;
+      display: none;
+    }
+
+    .footer-note {
+      margin-top: 30px;
+      text-align: center;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-shell">
+    <div class="logo"><span>Report</span><span>hub</span></div>
+
+    <form id="loginForm">
+      <select id="department" style="display:none;" required>
+        <option value="" disabled selected>Select Department</option>
+        <option value="deck">Deck</option>
+        <option value="electrical">Electrical</option>
+        <option value="engine">Engine</option>
+        <option value="store">Store</option>
+      </select>
+
+      <div class="field">
+        <label>Select Department</label>
+        <div class="segmented" id="deptSwitcher">
+          <div id="segmented-slider" class="selection-slider"></div>
+          <button type="button" data-val="deck" class="active">Deck</button>
+          <button type="button" data-val="electrical">Electrical</button>
+          <button type="button" data-val="engine">Engine</button>
+          <button type="button" data-val="store">Store</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="••••••••" required />
+      </div>
+
+      <button type="submit" class="btn-signin">Sign In Securely</button>
+      <div id="errorMessage" class="error"></div>
+    </form>
+
+    <div class="footer-note">
+      ReportHub Secure Access • Internal Use Only
+    </div>
+  </div>
+
+  <script>
+    // --- 1. NEW UI LOGIC (Switching the hidden select) ---
+    const buttons = document.querySelectorAll('#deptSwitcher button');
+    const slider = document.getElementById('segmented-slider');
+    const hiddenSelect = document.getElementById('department');
+
+    buttons.forEach((btn, index) => {
+      btn.onclick = () => {
+        // Move slider
+        slider.style.transform = `translateX(${index * 100}%)`;
+        
+        // Update active class
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        // Update the actual hidden select value for your existing JS
+        hiddenSelect.value = btn.getAttribute('data-val');
+      };
+    });
+
+    // Initialize default value
+    hiddenSelect.value = "deck";
+
+    // --- 2. YOUR ORIGINAL JS LOGIC (Untouched) ---
+    window.onload = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('expired') === 'true') {
+        const msg = document.getElementById('errorMessage');
+        msg.innerText = "Session expired. Please log in to continue.";
+        msg.style.display = 'block';
+        msg.style.color = '#856404';
+        msg.style.backgroundColor = '#fff3cd';
+        msg.style.border = '1px solid #ffeeba';
+      }
+    };
+
+    document.getElementById('loginForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const dept = document.getElementById('department').value;
+      const pass = document.getElementById('password').value;
+
+      const formData = new URLSearchParams();
+      formData.append('username', dept);
+      formData.append('password', pass);
+
+      try {
+        const resp = await fetch('/request-login', {
+          method: 'POST',
+          body: formData,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+
+        if (resp.ok) {
+          const urlParams = new URLSearchParams(window.location.search);
+          const nextPath = urlParams.get('next');
+          window.location.href = nextPath ? decodeURIComponent(nextPath) : '/home';
+        } else {
+          const msg = document.getElementById('errorMessage');
+          msg.innerText = "Invalid department or password.";
+          msg.style.display = 'block';
+          msg.style.color = '#721c24';
+          msg.style.backgroundColor = '#f8d7da';
+        }
+      } catch (err) {
+        alert("Server connection failed.");
+      }
+    };
+  </script>
+</body>
+</html>

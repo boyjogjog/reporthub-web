@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Reporthub | Image Portal</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Force Light Mode Colors */
+            --bg-main: #f8fafc;
+            --bg-card: #ffffff;
+            --primary: #36618e;
+            --primary-hover: #1d4ed8;
+            --success: #059669;
+            --success-hover: #047857;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body, html {
+            height: 100%; margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            /* Prevent dark mode override */
+            color-scheme: light; 
+        }
+
+        .centered-container {
+            height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            padding: 20px;
+        }
+
+        /* --- BRANDING --- */
+        .logo { 
+            text-align: center; 
+            font-size: 24px; 
+            font-weight: 700; 
+            margin-bottom: 32px; 
+            letter-spacing: -0.02em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .logo span:first-child { color: var(--text-main); }
+        .logo .hub-box {
+            background: var(--primary);
+            color: #fff; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            margin-left: 4px;
+        }
+
+        /* --- VIEWS --- */
+        #portalView {
+            display: none; 
+            width: 100%; max-width: 440px;
+            flex-direction: column; 
+            background: var(--bg-card); 
+            padding: 40px 24px;
+            border-radius: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+        }
+
+        .action-button {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 16px; color: white; border: none; cursor: pointer;
+            font-size: 1rem; width: 100%;
+            margin-bottom: 12px; border-radius: 12px; font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .action-button:active { transform: scale(0.97); }
+
+        #uploadBucketBtn { background-color: var(--primary); }
+        #uploadBucketBtn:hover { background-color: var(--primary-hover); }
+        
+        #uploadAttachBtn { background-color: var(--success); }
+        #uploadAttachBtn:hover { background-color: var(--success-hover); }
+
+        /* --- CONTROLS --- */
+        .quality-control {
+            margin-top: 24px;
+            padding: 20px; border: 1px solid var(--border); border-radius: 16px;
+            background-color: #fbfcfd;
+        }
+        .control-label {
+            display: flex; justify-content: space-between;
+            font-size: 12px; font-weight: 700; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.05em;
+        }
+
+        #statusContainer { display: none; flex-direction: column; align-items: center; width: 100%; }
+        #progressContainer { width: 100%; background: #f1f5f9; border-radius: 50px; height: 10px; overflow: hidden; margin: 20px 0; }
+        #progressBarFill { height: 100%; width: 0%; background: var(--primary); transition: width 0.3s ease; }
+
+        .checkmark-svg { width: 64px; height: 64px; stroke: var(--success); fill: none; stroke-width: 3; margin-bottom: 16px;}
+        
+        #errorView { 
+            display: none; background: #fff; padding: 40px 24px; 
+            border-radius: 24px; text-align: center; max-width: 400px; width: 100%;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        #loadingView { color: var(--text-muted); text-align: center; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+<div class="centered-container">
+    
+    <div id="loadingView">
+        <p>Connecting to Reporthub...</p>
+    </div>
+
+    <div id="errorView">
+        <div class="logo"><span>Report</span><span class="hub-box">hub</span></div>
+        <p id="errorMsg" style="font-size: 1.1rem; font-weight: 600; color: #1e293b;">Link Expired</p>
+        <p style="font-size: 14px; color: var(--text-muted); line-height: 1.6; margin-bottom: 24px;">
+            This session is no longer active. Please refresh the QR code on your desktop.
+        </p>
+        <button class="action-button" style="background: #e2e8f0; color: #475569;" onclick="location.reload()">🔄 Refresh</button>
+    </div>
+
+    <div id="portalView">
+        <div class="logo"><span>Report</span><span class="hub-box">hub</span></div>
+        
+        <div id="buttonContainer">
+            <p style="color: var(--text-muted); margin-bottom: 2.5em; text-align: center; font-size: 14px;">
+                Securely sync images from your mobile device to Reporthub or active activity.
+            </p>
+            
+            <input type="file" id="realFileInput" accept="image/*" multiple style="display:none;">
+            
+            <button class="action-button" id="uploadBucketBtn">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                Upload to Bucket
+            </button>
+            
+            <button class="action-button" id="uploadAttachBtn">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                Attach to Activity
+            </button>
+
+            <div class="quality-control">
+                <div class="control-label">
+                    <span>Compression</span>
+                    <span id="qVal">80%</span>
+                </div>
+                <input type="range" id="qSlider" min="10" max="100" value="80" style="width:100%; margin-top: 12px; accent-color: var(--primary);">
+            </div>
+        </div>
+
+        <div id="statusContainer">
+            <div id="progressContainer"><div id="progressBarFill"></div></div>
+            <div id="progressText" style="font-size: 14px; font-weight: 600; color: var(--text-main);">Processing...</div>
+            
+            <div id="successArea" style="display:none; text-align:center; margin-top: 10px;">
+                <svg class="checkmark-svg" viewBox="0 0 52 52">
+                    <circle cx="26" cy="26" r="25" fill="none" style="stroke:var(--success); stroke-width:2; opacity:0.1;" />
+                    <path d="M14.1 27.2l7.1 7.2 16.7-16.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <div style="color:var(--success); font-weight:700; font-size: 1.1rem;">Successfully Synced</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const portalView = document.getElementById('portalView');
+    const qSlider = document.getElementById('qSlider');
+    const qVal = document.getElementById('qVal');
+    const realInput = document.getElementById('realFileInput');
+    
+    // Track the attachment state globally within the script
+    let isAttachMode = false;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const bridgeCode = urlParams.get('c'); 
+
+    window.onload = () => {
+        document.getElementById('loadingView').style.display = 'none';
+        portalView.style.display = 'flex';
+        document.body.style.background = '#fff';
+    };
+
+    // Trigger file picker - Standard Upload
+    document.getElementById('uploadBucketBtn').onclick = () => {
+        isAttachMode = false;
+        realInput.click();
+    };
+
+    // Trigger file picker - Upload & Attach
+    document.getElementById('uploadAttachBtn').onclick = () => {
+        isAttachMode = true;
+        realInput.click();
+    };
+
+    qSlider.oninput = () => qVal.textContent = qSlider.value + "%";
+
+    realInput.onchange = async () => {
+        const files = Array.from(realInput.files);
+        if (!files.length) return;
+
+        // UI Switch
+        document.getElementById('buttonContainer').style.display = 'none';
+        document.getElementById('statusContainer').style.display = 'flex';
+        
+        const quality = parseInt(qSlider.value) / 100;
+        const totalFiles = files.length;
+
+        try {
+            for (let i = 0; i < totalFiles; i++) {
+                const currentFile = files[i];
+                const fileNumber = i + 1;
+
+                // 1. Update UI - Optimizing Phase
+                document.getElementById('progressText').textContent = `Optimizing ${fileNumber}/${totalFiles}...`;
+                const blob = await resizeImage(currentFile, 1600, quality);
+                
+                let baseProgress = (i / totalFiles) * 100;
+                document.getElementById('progressBarFill').style.width = (baseProgress + (50 / totalFiles)) + "%";
+
+                // 2. Update UI - Uploading Phase
+                document.getElementById('progressText').textContent = `Uploading ${fileNumber}/${totalFiles}...`;
+                
+                const formData = new FormData();
+                formData.append("file", blob, currentFile.name);
+
+                // Dynamically build the URL based on which button was clicked
+                const apiUrl = `/image-bucket/upload-image?code=${bridgeCode}&attach=${isAttachMode}`;
+
+                const resp = await fetch(apiUrl, {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!resp.ok) {
+                    throw new Error(`Failed to upload file ${fileNumber}`);
+                }
+
+                document.getElementById('progressBarFill').style.width = ((fileNumber / totalFiles) * 100) + "%";
+            }
+
+            // 3. Final Success State
+            document.getElementById('progressBarFill').style.width = "100%";
+            document.getElementById('progressText').style.display = 'none';
+            document.getElementById('successArea').style.display = 'block';
+            
+            setTimeout(() => window.location.reload(), 3000);
+
+        } catch (err) {
+            console.error(err);
+            showError("Transfer Failed: " + err.message);
+        }
+    };
+
+    // Client-side image optimization
+    function resizeImage(file, maxDim, quality) {
+        return new Promise((res) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let w = img.width, h = img.height;
+                    const scale = Math.min(1, maxDim / Math.max(w, h));
+                    canvas.width = w * scale; canvas.height = h * scale;
+                    const ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    canvas.toBlob((blob) => res(blob), 'image/jpeg', quality);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+</script>
+</body>
+</html>

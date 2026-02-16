@@ -1,0 +1,904 @@
+/* =========================================
+   1. GLOBAL STYLES & LAYOUT
+   ========================================= */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", sans-serif;
+    background: #f3f4f7;
+}
+
+.top-bg {
+    height: 240px;
+    background: #42a5f5;
+    position: absolute;
+    inset: 0 0 auto 0;
+    z-index: 0;
+}
+
+.app {
+    position: relative;
+    z-index: 1;
+    padding: 20px;
+}
+
+.main-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.left-panel {
+    width: 1000px;
+}
+
+.right-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* =========================================
+   2. TOP NAVIGATION & LOGO
+   ========================================= */
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    height: 46px;
+    margin-bottom: 12px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: 10px;
+}
+
+.logo span:first-child {
+    font-weight: bold;
+    font-size: 20px;
+    color: #263238;
+}
+
+.logo span:last-child {
+    font-weight: bold;
+    font-size: 20px;
+    background: #36618e;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.search-btn {
+    background: #36618e;
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* =========================================
+   3. SEGMENTED CONTROL (Daily/Weekly)
+   ========================================= */
+.segmented {
+    display: flex;
+    background: #48a0e7;
+    border-radius: 8px;
+    padding: 4px;
+    gap: 0;
+    position: relative;
+    width: 300px;
+}
+
+.segmented button {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    z-index: 2;
+    transition: color 0.3s ease;
+    font-weight: 600;
+}
+
+.segmented button.active {
+    color: white;
+}
+
+.selection-slider {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    bottom: 4px;
+    width: calc(33.33% - 2.66px);
+    background: #36618e;
+    border-radius: 6px;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 1;
+}
+
+/* =========================================
+   4. WHITEBOARD MAIN CONTAINER & HEADER
+   ========================================= */
+.whiteboard {
+    border: 2px solid #bbdefb;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background-color: #ffffff;
+    height: calc(100vh - 140px);
+}
+
+.whiteboard-header {
+    margin: 0;
+    padding: 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #d3d3d3;
+    flex-shrink: 0;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+}
+
+.header-buttons {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.header-buttons button {
+    padding: 10px 24px;
+    border-radius: 999px;
+    background-color: #f2f3fa;
+    border: none;
+    color: #1f759c;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+    outline: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header-buttons button:hover {
+    background-color: #ebedf5;
+    box-shadow: 0 6px 10px rgba(0,0,0,0.15), 0 3px 5px rgba(0,0,0,0.1);
+}
+
+.header-buttons button:active {
+    background-color: #dce0e9;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transform: translateY(0);
+}
+
+/* =========================================
+   5. EDITOR & LIST CONTENT
+   ========================================= */
+.whiteboard-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    position: relative;
+    outline: none;
+    padding: 15px;
+    min-height: 200px;
+}
+
+/* Parent container rules */
+.whiteboard-content ol,
+.whiteboard-content ul {
+    position: relative;
+    z-index: 2;
+    margin: 0;
+    padding: 24px 60px;
+    list-style-position: outside;
+}
+
+/* Ensure Ordered Lists actually show numbers */
+.whiteboard-content ol {
+    list-style-type: decimal !important;
+}
+
+/* Ensure Unordered Lists show dots */
+.whiteboard-content ul {
+    list-style-type: disc !important;
+}
+
+/* Common List Item Styles */
+.whiteboard-content ol li,
+.whiteboard-content ul li,
+#editor li {
+    display: list-item !important; /* Required for the number/dot to exist */
+    padding: 4px 12px;
+    margin: 1px 0;
+    border-radius: 6px;
+    cursor: text;
+    line-height: 1.4;
+    min-height: 1.4em;
+    /* Removed list-style-type: disc from here so it doesn't override the parent */
+}
+
+/* Specific gap for internal content (like images) */
+.whiteboard-content li {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+/* Animated Highlighter */
+.li-highlighter {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    margin-left: 24px;
+    margin-right: 24px;
+    background-color: #bbdefb;
+    border-radius: 6px;
+    transition: top 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                height 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.1s;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0;
+}
+
+/* =========================================
+   6. ATTACHED IMAGES (In-Editor)
+   ========================================= */
+.li-image-scroll {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 6px 4px;
+    caret-color: transparent;
+    user-select: none;
+}
+
+.li-img-wrapper {
+    height: 150px;
+    display: inline-block;
+    flex-shrink: 0;
+    unicode-bidi: isolate;
+    position: relative; /* Fix: Ensures delete icon is relative to this wrapper */
+}
+
+.li-img-wrapper img {
+    height: 100%;
+    width: auto;
+    max-width: 240px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.report-img {
+    pointer-events: auto;
+    display: block;
+    border-radius: 4px;
+}
+
+/* Delete Button Overlay */
+.img-delete-overlay {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+    background: rgba(220, 38, 38, 0.9);
+    color: white;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: all 0.2s ease;
+    cursor: pointer;
+    z-index: 10;
+}
+
+.li-img-wrapper:hover .img-delete-overlay {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.img-delete-overlay:hover {
+    background: #b91c1c;
+    transform: scale(1.1) !important;
+}
+
+/* =========================================
+   7. RIGHT PANEL WIDGETS & CALENDAR
+   ========================================= */
+.right-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+    height: 42px;
+}
+
+.right-header:hover { background-color: #f5f5f5; }
+
+.right-header span:first-child {
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    letter-spacing: 0.5px;
+    padding-right: 12px;
+}
+
+.right-header span:last-child {
+    margin-left: 12px;
+    font-size: 14px;
+    color: #36618e;
+    transition: transform 0.3s ease, color 0.3s ease;
+    display: flex;
+    align-items: center;
+}
+
+.right-header:hover span:last-child {
+    transform: rotate(90deg);
+    color: #000000;
+}
+
+.widget {
+    background: white;
+    border-radius: 10px;
+    padding: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.calendar {
+    border: 2px solid #bbdefb;
+    padding: 10px;
+    display: inline-block;
+    width: min-content;
+    position: relative;
+    overflow: hidden;
+}
+
+.cal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 6px 0;
+}
+
+.cal-header button,
+.cal-header #monthYear {
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.cal-header button { font-size: 12px; }
+.cal-header #monthYear { font-size: 15px; }
+
+.cal-weekdays,
+.cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 32px);
+    gap: 1px;
+    justify-content: center;
+}
+
+.cal-weekdays span {
+    font-size: 14px;
+    text-align: center;
+    margin: 12px 0;
+}
+
+.cal-day {
+    width: 32px;
+    height: 32px;
+    line-height: 40px;
+    border-radius: 5px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cal-day.today { border: 2px solid #90caf9; }
+.cal-day.selected { background: #bbdefb; }
+
+.calendar-curtain {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    color: #64748b;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    backdrop-filter: blur(2px);
+}
+
+.widget.calendar.mode-disabled .calendar-curtain {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* =========================================
+   8. IMAGE BUCKET WIDGET
+   ========================================= */
+.image-bucket {
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 254px;
+    border: 2px solid #90caf9;
+}
+
+.image-bucket-header {
+    width: 100%;
+    background-color: #90caf9;
+    color: rgb(0, 0, 0);
+    padding: 14px;
+    font-weight: bold;
+    font-size: 15px;
+    box-sizing: border-box;
+}
+
+.image-bucket-content {
+    padding: 0 !important;
+    width: 250px;
+    height: 180px;
+    background-color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.image-bucket, .image-bucket * {
+    box-sizing: border-box;
+}
+
+.image-bucket-content img {
+    width: 80% !important;
+    height: 80% !important;
+    object-fit: contain;
+    padding: 10px;
+}
+
+.image-bucket-footer {
+    width: 100%;
+    padding: 16px 28px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #546e7a;
+    line-height: 1.3;
+    border-top: 1px solid #f0f0f0;
+    background-color: #fafafa;
+    box-sizing: border-box;
+}
+
+#qrcode-canvas {
+    padding: 10px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+#qrcode-canvas canvas,
+#qrcode-canvas img {
+    display: block;
+    margin: 0 auto;
+}
+
+/* =========================================
+   9. IMAGE STREAM WIDGET
+   ========================================= */
+.image-stream {
+    padding: 0;
+    overflow: hidden;
+    width: min-content;
+    border: 2px solid #bbdefb;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#streamImage {
+    width: 250px;
+    height: 188px;
+    object-fit: cover;
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* =========================================
+   10. MODALS (GALLERY & DECISION)
+   ========================================= */
+#gallery-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(12px);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.gallery-container {
+    width: 100%;
+    max-width: 1100px;
+    height: 85vh;
+    background: #ffffff;
+    border-radius: 24px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+}
+
+.gallery-header {
+    padding: 20px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f1f5f9;
+    background-color: #42a5f5;
+    
+}
+
+.gallery-header h3 { margin: 0; font-size: 1.25rem; font-weight: 700; color: #0f172a; }
+
+.close-btn {
+    background: #f1f5f9; border: none; width: 32px; height: 32px;
+    border-radius: 50%; cursor: pointer; transition: 0.2s;
+}
+.close-btn:hover { background: #fee2e2; color: #ef4444; }
+
+.gallery-body { display: flex; flex: 1; overflow: hidden; }
+
+.gallery-sidebar {
+    width: 280px; background: #f8fafc; padding: 24px;
+    border-right: 1px solid #f1f5f9; overflow-y: auto;
+}
+
+.sidebar-label {
+    font-size: 0.7rem; font-weight: 700; color: #94a3b8;
+    text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px;
+}
+
+.folder-item {
+    padding: 12px 16px; border-radius: 12px; cursor: pointer;
+    font-size: 0.9rem; font-weight: 500; color: #475569;
+    transition: 0.2s; margin-bottom: 4px; display: flex; align-items: center; gap: 10px;
+}
+
+.folder-item:hover { background: #f1f5f9; color: #3b82f6; }
+.folder-item.active { background: #42a5f5; color: white; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3); }
+
+.gallery-content { flex: 1; overflow-y: auto; padding: 24px; background: #fff; }
+
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+.img-card {
+    position: relative; aspect-ratio: 1 / 1; border-radius: 12px;
+    overflow: hidden; cursor: pointer; border: 4px solid transparent;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    background: #f1f5f9;
+}
+
+.img-card img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: high-quality;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.img-card.selected::before {
+    content: '✓'; position: absolute; top: 8px; right: 8px;
+    background: #3b82f6; color: white; width: 24px; height: 24px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 14px; z-index: 2;
+}
+
+.img-card.selected {
+    border-color: #3b82f6;
+    transform: scale(0.95);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+}
+
+.img-card.selected::after {
+    content: '✓';
+    position: absolute; top: 8px; right: 8px;
+    background: #3b82f6; color: white; width: 24px; height: 24px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: bold;
+}
+
+.gallery-footer {
+    padding: 20px 32px; border-top: 1px solid #f1f5f9;
+    display: flex; justify-content: space-between; align-items: center;
+    background: #fff;
+}
+
+.footer-actions { display: flex; gap: 12px; }
+
+.btn-base {
+    padding: 10px 20px; border-radius: 10px; font-weight: 600;
+    font-size: 0.9rem; border: none; cursor: pointer; transition: 0.2s;
+}
+
+.btn-copy { background: #f1f5f9; color: #475569; }
+.btn-delete { background: #fee2e2; color: #ef4444; }
+.btn-attach { background: #3b82f6; color: white; }
+.btn-base:hover { transform: translateY(-2px); filter: brightness(0.95); }
+
+/* Removal Decision Modal */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 20000;
+    align-items: center;
+    justify-content: center;
+}
+
+.decision-card {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    width: 320px;
+    text-align: center;
+}
+
+.decision-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn-secondary { background: #f1f5f9; color: #475569; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.btn-danger { background: #fee2e2; color: #dc2626; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.btn-ghost { background: transparent; color: #94a3b8; border: none; cursor: pointer; padding: 5px; font-size: 13px; }
+.btn-secondary:hover { background: #e2e8f0; }
+.btn-danger:hover { background: #fecaca; }
+
+/* =========================================
+   11. FEEDBACK (SNACKBAR)
+   ========================================= */
+#snackbar {
+    visibility: hidden;
+    min-width: 250px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 8px;
+    padding: 16px;
+    position: fixed;
+    z-index: 10001;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%);
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+#snackbar.show {
+    visibility: visible;
+    animation: fadein 0.5s, fadeout 0.5s 2.5s;
+}
+
+@keyframes fadein { from { bottom: 0; opacity: 0; } to { bottom: 30px; opacity: 1; } }
+@keyframes fadeout { from { bottom: 30px; opacity: 1; } to { bottom: 0; opacity: 0; } }
+
+
+
+
+/* Magnifier Overlay */
+#image-magnifier {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(10, 10, 15, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 100000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    touch-action: none;
+}
+
+#mag-viewport {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+}
+
+#mag-img {
+    max-width: 90%;
+    max-height: 90%;
+    cursor: grab;
+    border-radius: 4px;
+    box-shadow: 0 0 50px rgba(0,0,0,0.6);
+    will-change: transform;
+    user-select: none;
+    pointer-events: auto;
+    transition: filter 0.3s ease, opacity 0.2s ease;
+    /* Prevents the image from "jumping" if dimensions differ slightly */
+    object-fit: contain; 
+}
+
+/* UI Controls (Arrows & X) */
+.mag-nav, .mag-close-icon {
+    position: absolute;
+    color: white;
+    cursor: pointer;
+    user-select: none;
+    z-index: 100001;
+    background: rgba(255, 255, 255, 0.1);
+    width: 60px;
+    height: 60px;
+    
+    /* Perfect Center Fix */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    padding-bottom: 6px; /* Offsets character baseline to look centered */
+    
+    border-radius: 50%;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+/* Show buttons on mouse move over overlay */
+#image-magnifier:hover .mag-nav, 
+#image-magnifier:hover .mag-close-icon {
+    opacity: 1;
+}
+
+/* Navigation Specifics */
+.mag-nav {
+    font-size: 50px;
+    font-weight: 200;
+}
+
+.mag-nav:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.mag-prev { left: 40px; }
+.mag-next { right: 40px; }
+
+/* Close Button Specifics */
+.mag-close-icon {
+    top: 40px;
+    right: 40px;
+    font-size: 30px;
+    padding-bottom: 2px; /* 'x' centers differently than arrows */
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+.mag-close-icon:hover {
+    background: rgba(239, 68, 68, 0.85); /* Red Tint */
+    transform: scale(1.1) rotate(90deg);
+}
+
+#mag-img:active { cursor: grabbing; }
+
+/* Search UI Specifics */
+.search-input-wrapper {
+    display: flex;
+    align-items: center;
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 4px 12px;
+    width: 500px;
+    transition: border-color 0.2s;
+}
+
+.search-input-wrapper:focus-within {
+    border-color: #36618e;
+    background: #fff;
+}
+
+#global-search-input {
+    border: none;
+    background: transparent;
+    outline: none;
+    padding: 8px;
+    flex-grow: 1;
+    font-size: 15px;
+    color: #1e293b;
+}
+
+#btn-exit-search {
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 5px;
+}
+
+#btn-exit-search:hover {
+    color: #ef4444;
+}
+
+.search-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #94a3b8;
+    gap: 10px;
+}
+
+.search-result-item:hover {
+    background-color: #f8fafc;
+}
+
+.search-loading, .search-error {
+    padding: 40px;
+    text-align: center;
+    color: #64748b;
+    font-style: italic;
+}
+
+/* Make the search area scrollable */
+#search-results-area {
+    overflow-y: auto;
+    flex-grow: 1;
+    background: #fff;
+}
