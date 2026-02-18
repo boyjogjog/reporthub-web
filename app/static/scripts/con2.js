@@ -1,6 +1,7 @@
 /**
  * ConnectivityManager: The central hub for all Server-Side communication.
- * Handles: SSE Streams, Session Heartbeats, and Centralized API Fetching.
+ * Handles: SSE Streams, Session Heartbeats, Centralized API Fetching,
+ * and Account Session UI (Logout Menu).
  */
 export default class ConnectivityManager {
     constructor(options = {}) {
@@ -18,15 +19,27 @@ export default class ConnectivityManager {
 
         // Elements & Callbacks
         this.containerId = options.containerId || "qrcode-canvas";
+
         this.callbacks = {
-            onImages: options.onImages || (() => {}),
+            onNewImage: options.onNewImage || (() => {}),
             onSearchMatch: options.onSearchMatch || (() => {}),
             onSearchProgress: options.onSearchProgress || (() => {}),
             onSearchComplete: options.onSearchComplete || (() => {}),
             onError: options.onError || ((err) => console.error("CM Error:", err)),
         };
 
+        // Account Menu Configuration (NEW)
+        this.accountMenuConfig = {
+            headerId: options.accountHeaderId || null,
+            menuId: options.accountMenuId || null,
+            logoutBtnId: options.logoutBtnId || null,
+        };
+
+        // Bound handlers (so we can properly remove them)
         this.throttledHandler = this.handleActivity.bind(this);
+        this.boundToggleMenu = null;
+        this.boundCloseMenu = null;
+        this.boundLogout = null;
     }
 
     // --- INITIALIZATION ---
@@ -40,8 +53,42 @@ export default class ConnectivityManager {
 
         this.connectSSE();
         this.setupActivityListeners();
+        this.setupAccountMenu(); // ✅ Integrated here
         this.executePing(); // Initial sync
+
         console.log("Connectivity Manager: Online");
+    }
+
+    // --- ACCOUNT MENU INTEGRATION ---
+
+    setupAccountMenu() {
+        const { headerId, menuId, logoutBtnId } = this.accountMenuConfig;
+
+        if (!headerId || !menuId || !logoutBtnId) return;
+
+        const header = document.getElementById(headerId);
+        const menu = document.getElementById(menuId);
+        const logoutBtn = document.getElementById(logoutBtnId);
+
+        if (!header || !menu || !logoutBtn) return;
+
+        // Bind handlers once so we can remove them later
+        this.boundToggleMenu = (e) => {
+            e.stopPropagation();
+            menu.classList.toggle('active');
+        };
+
+        this.boundCloseMenu = () => {
+            menu.classList.remove('active');
+        };
+
+        this.boundLogout = () => {
+            this.logout();
+        };
+
+        header.addEventListener('click', this.boundToggleMenu);
+        window.addEventListener('click', this.boundCloseMenu);
+        logoutBtn.addEventListener('click', this.boundLogout);
     }
 
     // --- SSE LOGIC ---
@@ -59,7 +106,7 @@ export default class ConnectivityManager {
 
         this.evtSource.addEventListener("NEW_IMAGE", (event) => {
             const data = this.safeParse(event.data);
-            if (data?.['image-uuid']) this.callbacks.onImages(data);
+            if (data?.['image-uuid']) this.callbacks.onNewImage(data);
         });
 
         this.evtSource.addEventListener("SEARCH_MATCH", (event) => {
@@ -72,7 +119,9 @@ export default class ConnectivityManager {
             this.callbacks.onSearchProgress(payload.date);
         });
 
-        this.evtSource.addEventListener("SEARCH_COMPLETE", () => this.callbacks.onSearchComplete());
+        this.evtSource.addEventListener("SEARCH_COMPLETE", () => {
+            this.callbacks.onSearchComplete();
+        });
 
         this.evtSource.onerror = () => {
             console.warn("SSE disconnected. Retrying...");
@@ -83,20 +132,25 @@ export default class ConnectivityManager {
     renderQRCode() {
         const container = document.getElementById(this.containerId);
         if (!container) return;
+
         container.innerHTML = "";
         const portalUrl = `${window.location.origin}/rip?c=${this.code}`;
-        new QRCode(container, { text: portalUrl, width: 180, height: 180 });
+
+        new QRCode(container, {
+            text: portalUrl,
+            width: 180,
+            height: 180
+        });
+
         console.log(portalUrl);
     }
 
     // --- API & FETCH WRAPPER (Centralized) ---
 
-    /**
-     * The primary method for all API calls. 
-     * Handles credentials, common headers, and global error catching.
-     */
     async request(endpoint, options = {}) {
-        const url = endpoint.startsWith('http') ? endpoint : `${window.location.origin}${endpoint}`;
+        const url = endpoint.startsWith('http')
+            ? endpoint
+            : `${window.location.origin}${endpoint}`;
         
         const defaultOptions = {
             credentials: 'include',
@@ -120,7 +174,7 @@ export default class ConnectivityManager {
             return await response.json();
         } catch (err) {
             this.callbacks.onError(err);
-            throw err; 
+            throw err;
         }
     }
 
@@ -128,7 +182,9 @@ export default class ConnectivityManager {
 
     setupActivityListeners() {
         const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
-        events.forEach(name => window.addEventListener(name, this.throttledHandler, { passive: true }));
+        events.forEach(name =>
+            window.addEventListener(name, this.throttledHandler, { passive: true })
+        );
     }
 
     handleActivity() {
@@ -141,7 +197,9 @@ export default class ConnectivityManager {
 
     async executePing(checkOnly = false) {
         if (this.isPinging || !this.code) return;
+
         this.isPinging = true;
+
         if (this.autoLogoutTimer) clearTimeout(this.autoLogoutTimer);
 
         try {
@@ -150,9 +208,11 @@ export default class ConnectivityManager {
             
             const data = await this.request(`${this.pingUrl}?${params.toString()}`);
 
-            // Logic: if ttl is very low or response is invalid, we might need logout
             if (data.ttl_ms > 5000) {
-                this.autoLogoutTimer = setTimeout(() => this.confirmAndLogout(), data.ttl_ms + 1000);
+                this.autoLogoutTimer = setTimeout(
+                    () => this.confirmAndLogout(),
+                    data.ttl_ms + 1000
+                );
             } else {
                 this.logout();
             }
@@ -177,15 +237,39 @@ export default class ConnectivityManager {
     safeParse(data) {
         try {
             let parsed = JSON.parse(data);
-            return typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
-        } catch (e) { return null; }
+            return typeof parsed === 'string'
+                ? JSON.parse(parsed)
+                : parsed;
+        } catch (e) {
+            return null;
+        }
     }
 
     destroy() {
         this.isStarted = false;
+
         if (this.evtSource) this.evtSource.close();
         if (this.autoLogoutTimer) clearTimeout(this.autoLogoutTimer);
+
         const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
-        events.forEach(name => window.removeEventListener(name, this.throttledHandler));
+        events.forEach(name =>
+            window.removeEventListener(name, this.throttledHandler)
+        );
+
+        // Remove account menu listeners (NEW cleanup)
+        const { headerId, menuId, logoutBtnId } = this.accountMenuConfig;
+
+        const header = document.getElementById(headerId);
+        const menu = document.getElementById(menuId);
+        const logoutBtn = document.getElementById(logoutBtnId);
+
+        if (header && this.boundToggleMenu)
+            header.removeEventListener('click', this.boundToggleMenu);
+
+        if (logoutBtn && this.boundLogout)
+            logoutBtn.removeEventListener('click', this.boundLogout);
+
+        if (this.boundCloseMenu)
+            window.removeEventListener('click', this.boundCloseMenu);
     }
 }

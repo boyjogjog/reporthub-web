@@ -268,7 +268,7 @@ export default class WhiteboardManager {
     async updateView(selection) {
         // 1. Save current work BEFORE selection changes
         if (this.isDirty && this.selection) {
-            //this._saveReport();
+            this._saveReport();
         }
 
         this.selection = selection;
@@ -973,122 +973,9 @@ export default class WhiteboardManager {
     }
 
 
-    async _executeSearch(query) {
-        if (!query.trim()) return;
-
-        const resultsArea = document.getElementById('search-results-area');
-        resultsArea.innerHTML = '<div class="search-loading">Searching history...</div>';
-
-        try {
-            const response = await fetch(`/search-reports?q=${encodeURIComponent(query)}`);
-            const data = await response.json();
-
-            if (!data.items || data.items.length === 0) {
-                resultsArea.innerHTML = `
-                    <div class="search-placeholder">
-                        <p>No results found for "${query}"</p>
-                    </div>`;
-                return;
-            }
-
-            // Render the results
-            resultsArea.innerHTML = data.items.map(item => `
-                <div class="search-result-item" data-uuid="${item.uuid}" style="
-                    padding: 15px;
-                    border-bottom: 1px solid #eee;
-                    cursor: pointer;
-                    transition: background 0.2s;
-                ">
-                    <div style="font-weight: bold; color: #36618e; margin-bottom: 5px;">
-                        ${item.report_dateStr}
-                    </div>
-                    <div style="font-size: 14px; color: #444; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                        ${item.text}
-                    </div>
-                </div>
-            `).join('');
-
-            // Add click listeners to results to "jump" to that report
-            resultsArea.querySelectorAll('.search-result-item').forEach(el => {
-                el.onclick = () => {
-                    const uuid = el.getAttribute('data-uuid');
-                    this._loadHistoricalReport(uuid);
-                };
-            });
-
-        } catch (err) {
-            resultsArea.innerHTML = '<div class="search-error">Search failed. Check connection.</div>';
-            console.error("Search Error:", err);
-        }
-    }
-
     //========================================================================================================
     //  UI HELPERS
-    //========================================================================================================
-
-    _renderSearchUI() {
-        // 1. Clear the whiteboard
-        this.whiteboard.innerHTML = `
-            <div class="search-view-container" style="display: flex; flex-direction: column; height: 100%;">
-                <div class="whiteboard-header">
-                    <div class="header-left">
-                        <div class="search-input-wrapper">
-                            <span class="material-symbols-rounded">search</span>
-                            <input type="text" id="global-search-input" placeholder="Search across all history...">
-                            <button id="btn-exit-search" title="Close Search">✕</button>
-                        </div>
-                    </div>
-                    <div class="header-buttons">
-                        </div>
-                </div>
-                <div id="search-results-area" class="whiteboard-content">
-                    <div class="search-placeholder">
-                        <span class="material-symbols-rounded" style="font-size: 48px; opacity: 0.2;">history_edu</span>
-                        <p>Enter keywords to search past reports</p>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        const input = document.getElementById('global-search-input');
-        input.focus();
-
-        // Event Listeners
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') this._executeSearch(input.value);
-        });
-
-        document.getElementById('btn-exit-search').onclick = () => {
-            // Switch back to Daily Mode (Mode 0) or whatever was previous
-            this.updateView({ mode: 0, value: "Daily Activities" });
-        };
-    }
-
-    _restoreEditorUI() {
-        // Re-inject the original HTML structure for the editor
-        this.whiteboard.innerHTML = `
-            <h3 class="whiteboard-header">
-                <div class="header-left">
-                    <span class="icon">📝</span>
-                    <span id="header-text"></span>
-                </div>
-                <div class="header-buttons">
-                    <button id="btn-import">Import</button>
-                    <button id="btn-export">Export</button>
-                    <button id="btn-send">Send to Real Report</button>
-                    <button id="btn-attach">Attach Image</button>
-                    <button id="btn-save">Save</button>
-                </div>
-            </h3>
-            <div class="whiteboard-content" contenteditable="true" id="editor">
-                <div id="li-highlighter" class="li-highlighter"></div>
-            </div>
-        `;
-        // Re-cache elements because the old references are now dead
-        this.editor = document.getElementById('editor');
-        this.headerSpan = document.getElementById('header-text');
-        // ... re-bind buttons if necessary
-    }
+    //=======================================================================================================
 
     moveHighlighter() {
         const selection = window.getSelection();

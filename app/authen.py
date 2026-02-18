@@ -1,12 +1,12 @@
 import time
-from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Request
 from jose import JWTError, jwt
 
 # --- CONFIG ---
 SECRET_KEY = "my-very-secret-key"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+# Standardizing to seconds (1 hour = 3600 seconds)
+ACCESS_TOKEN_EXPIRE_SECONDS = 60 * 60 
 
 
 # ---------------------------
@@ -15,8 +15,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": int(expire.timestamp())})
+    # time.time() returns seconds since epoch as a float
+    expire = int(time.time() + ACCESS_TOKEN_EXPIRE_SECONDS)
+    to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -25,6 +26,7 @@ def create_access_token(data: dict) -> str:
 # ---------------------------
 
 def verify_access_token(token: str) -> dict:
+    # Decodes and automatically checks 'exp' claim against current time
     return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
 
@@ -40,6 +42,7 @@ async def get_auth_data(request: Request) -> dict:
         return verify_access_token(token)
     except JWTError:
         raise HTTPException(status_code=401, detail="Session expired")
+    #return True
 
 
 # ---------------------------
@@ -49,16 +52,12 @@ async def get_auth_data(request: Request) -> dict:
 def renew_access_token(old_payload: dict) -> tuple[str, int]:
     """
     Creates a fresh token using existing payload.
-    Returns:
-        (new_token, new_exp_timestamp)
+    Returns: (new_token, new_exp_timestamp)
     """
-
-    # Remove old exp if present
+    # Filter out old 'exp' to replace it
     payload = {k: v for k, v in old_payload.items() if k != "exp"}
 
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    new_exp = int(expire.timestamp())
-
+    new_exp = int(time.time() + ACCESS_TOKEN_EXPIRE_SECONDS)
     payload.update({"exp": new_exp})
 
     new_token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -75,7 +74,8 @@ def get_token_ttl_ms(payload: dict) -> int:
     if not exp_ts:
         return 0
 
-    now_ts = int(datetime.now(timezone.utc).timestamp())
+    # Direct subtraction with time.time() is much cleaner
+    now_ts = time.time()
+    remaining_seconds = exp_ts - now_ts
 
-    return max((exp_ts - now_ts) * 1000, 0)
-
+    return max(int(remaining_seconds * 1000), 0)

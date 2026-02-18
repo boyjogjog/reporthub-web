@@ -6,7 +6,9 @@
   <title>Reporthub</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    rel="stylesheet" />
   <link rel="stylesheet" href="static/styles.css">
 
 </head>
@@ -37,17 +39,29 @@
 
         <div id="whiteboard" class="whiteboard">
           <h3 class="whiteboard-header">
-            <div class="header-left">
-              <span class="icon">📝</span>
-              <span>Daily Activities Report - February 06, 2026</span>
+            <div id="header-standard" class="header-content-wrapper"
+              style="display: flex; width: 100%; justify-content: space-between; align-items: center;">
+              <div class="header-left">
+                <span class="icon">📝</span>
+                <span id="header-title">Daily Activities Report - February 06, 2026</span>
+              </div>
+              <div class="header-buttons">
+                <button id="btn-import">Import</button>
+                <button id="btn-export">Export</button>
+                <button id="btn-send">Send to Real Report</button>
+                <button id="btn-attach">Attach Image</button>
+                <button id="btn-save">Save</button>
+              </div>
             </div>
 
-            <div class="header-buttons">
-              <button id="btn-import">Import</button>
-              <button id="btn-export">Export</button>
-              <button id="btn-send">Send to Real Report</button>
-              <button id="btn-attach">Attach Image</button>
-              <button id="btn-save">Save</button>
+            <div id="header-search" class="header-content-wrapper"
+              style="display: none; width: 100%; align-items: center; gap: 12px;">
+              <span class="material-symbols-rounded" style="color: #64748b;">search</span>
+              <input type="text" id="history-search-input" placeholder="Search history by Flow ID, Task, or Assignee..."
+                style="flex: 1; border: none; outline: none; background: transparent; font-size: 16px;">
+              <button class="btn-ghost" id="btn-close-search" style="border:none; background:none; cursor:pointer;">
+                <span class="material-symbols-rounded">close</span>
+              </button>
             </div>
           </h3>
 
@@ -59,9 +73,21 @@
 
       <!-- RIGHT -->
       <div class="right-panel">
-        <div class="right-header">
-          <span>Engine Department</span>
-          <span>⚙</span>
+        <div class="account-container">
+          <div class="right-header" id="account-header">
+            <div class="dept-info">
+              <span class="dept-label">DEPARTMENT</span>
+              <span class="dept-name">Engine Department</span>
+            </div>
+            <span class="material-symbols-rounded settings-icon">settings</span>
+          </div>
+
+          <div id="logout-menu" class="dropdown-menu">
+            <button id="btn-logout">
+              <span class="material-symbols-rounded">logout</span>
+              Logout
+            </button>
+          </div>
         </div>
 
         <div class="widget calendar">

@@ -2,7 +2,7 @@
  * ImageBucketManager
  * Modes: 0 - Explorer, 1 - Attach
  */
-export default class ImageBucketManager {
+export default class ImageManager {
     constructor() {
         this.selectedUuids = [];
         this.callbacks = { attach: null, copy: null, delete: null };

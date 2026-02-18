@@ -18,7 +18,7 @@ daily_image_links = Table(
 
 # Table for 2-Weekly Reports
 two_weekly_image_links = Table(
-    "weekly_image_links",
+    "two_weekly_image_links",
     DeptBase.metadata,
     Column("report_uuid", String, ForeignKey("two_weekly_reports.uuid", ondelete="CASCADE"), primary_key=True),
     Column("image_uuid", String, ForeignKey("image_bucket.uuid", ondelete="CASCADE"), primary_key=True),

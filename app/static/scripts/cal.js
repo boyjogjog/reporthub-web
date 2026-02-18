@@ -135,13 +135,17 @@ export default class CalendarManager {
 
     _calculateInitialRange(date) {
         const y = date.getFullYear();
-        const m = date.getMonth();
+        const m = date.getMonth(); // 0 = Jan, 1 = Feb...
         const d = date.getDate();
-        if (d <= 15) {
-            return [new Date(y, m, 1), new Date(y, m, 15)];
+
+        // Determine the split day: 14 for February, 15 for all other months
+        const splitDay = (m === 1) ? 14 : 15;
+
+        if (d <= splitDay) {
+            return [new Date(y, m, 1), new Date(y, m, splitDay)];
         } else {
             const lastDay = new Date(y, m + 1, 0).getDate();
-            return [new Date(y, m, 16), new Date(y, m, lastDay)];
+            return [new Date(y, m, splitDay + 1), new Date(y, m, lastDay)];
         }
     }
 
