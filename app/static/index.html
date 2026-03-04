@@ -5,10 +5,7 @@
   <meta charset="UTF-8">
   <title>Reporthub</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <link
-    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
-    rel="stylesheet" />
+  <link rel="icon" href="static/icons/flet.png">
   <link rel="stylesheet" href="static/styles.css">
 
 </head>
@@ -34,7 +31,7 @@
             <button>Common</button>
           </div>
 
-          <button class="search-btn">Search History</button>
+          <button class="search-btn"><span class="icon search-icon"></span>Search History</button>
         </div>
 
         <div id="whiteboard" class="whiteboard">
@@ -42,26 +39,38 @@
             <div id="header-standard" class="header-content-wrapper"
               style="display: flex; width: 100%; justify-content: space-between; align-items: center;">
               <div class="header-left">
-                <span class="icon">📝</span>
-                <span id="header-title">Daily Activities Report - February 06, 2026</span>
+                <span class="icon report-icon"></span>
+                <span id="header-title"></span>
               </div>
               <div class="header-buttons">
-                <button id="btn-import">Import</button>
-                <button id="btn-export">Export</button>
-                <button id="btn-send">Send to Real Report</button>
-                <button id="btn-attach">Attach Image</button>
-                <button id="btn-save">Save</button>
+                <button id="btn-import" class="icon-button">
+                  <span class="icon import-icon"></span>
+                  Import
+                </button>
+                <button id="btn-export" class="icon-button">
+                  <span class="icon export-icon"></span>
+                  Export
+                </button>
+                <button id="btn-send" class="icon-button">
+                  <span class="icon send-icon"></span>
+                  Copy-Paste to Real Report
+                </button>
+                <button id="btn-attach" class="icon-button">
+                  <span class="icon attach-icon"></span>
+                  Attach Images
+                </button>
+                <button id="btn-save" class="icon-button">
+                  <span class="icon save-icon"></span>
+                  Save
+                </button>
               </div>
             </div>
 
             <div id="header-search" class="header-content-wrapper"
               style="display: none; width: 100%; align-items: center; gap: 12px;">
-              <span class="material-symbols-rounded" style="color: #64748b;">search</span>
-              <input type="text" id="history-search-input" placeholder="Search history by Flow ID, Task, or Assignee..."
+              <span class="icon search2-icon"></span>
+              <input type="text" id="history-search-input" placeholder="Search reports."
                 style="flex: 1; border: none; outline: none; background: transparent; font-size: 16px;">
-              <button class="btn-ghost" id="btn-close-search" style="border:none; background:none; cursor:pointer;">
-                <span class="material-symbols-rounded">close</span>
-              </button>
             </div>
           </h3>
 
@@ -77,14 +86,14 @@
           <div class="right-header" id="account-header">
             <div class="dept-info">
               <span class="dept-label">DEPARTMENT</span>
-              <span class="dept-name">Engine Department</span>
+              <span class="dept-name"></span>
             </div>
-            <span class="material-symbols-rounded settings-icon">settings</span>
+            <span class="icon settings-icon">settings</span>
           </div>
 
           <div id="logout-menu" class="dropdown-menu">
             <button id="btn-logout">
-              <span class="material-symbols-rounded">logout</span>
+              <span class="icon logout-icon"></span>
               Logout
             </button>
           </div>
@@ -104,8 +113,9 @@
 
         <div class="widget image-bucket">
           <div class="image-bucket-header">
-            Image Bucket
-          </div>
+            <span class="icon image-bucket-icon"></span>
+            <span>Image Bucket</span>
+        </div>
           <div class="image-bucket-content">
             <div id="qrcode-canvas">
               <div id="qrcode-canvas" style="padding: 10px; background: white; border-radius: 4px;"></div>
@@ -115,8 +125,9 @@
             Scan to upload or attach your job related images
           </div>
         </div>
-        <div class="widget image-stream">
-          <img id="streamImage" src="http://192.168.10.100:8888/get-latest-image" alt="image Stream">
+        <div class="widget image-stream" id="streamContainer">
+          <img id="image-1" class="stream-img active" src="" alt="Stream 1">
+          <img id="image-2" class="stream-img" src="" alt="Stream 2">
         </div>
       </div>
 
@@ -156,24 +167,22 @@
       <footer class="gallery-footer">
         <div id="selection-status" style="font-weight: 600; color: #64748b;">0 images selected</div>
         <div class="footer-actions">
-          <button class="btn-base btn-copy">Copy Links</button>
-          <button class="btn-base btn-delete">Delete</button>
-          <button class="btn-base btn-attach">Attach to Report</button>
+          <button class="btn-base btn-copy">Copy Images</button>
+          <button class="btn-base btn-delete">Permanent Delete</button>
+          <button class="btn-base btn-attach">Attach to Active Report</button>
         </div>
       </footer>
     </div>
   </div>
 
-  <div id="decision-modal" class="modal-overlay">
-    <div class="decision-card">
-      <h3>Image Removal</h3>
-      <p>Paano mo gustong tangalin ito?</p>
-      <div class="decision-actions">
-        <button id="btn-detach-confirm" class="btn-secondary">Detach from Report</button>
-        <button id="btn-delete-confirm" class="btn-danger">Delete from Server</button>
-        <button id="btn-cancel-confirm" class="btn-ghost">Cancel</button>
+  <div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    
+    <div class="loader"></div>
+    
+      <div style="color: white; margin-top: 25px; font-size: 1.2rem; text-align: center; font-weight: 300; letter-spacing: 1px;">
+          Generating 2 Weekly Report Document.<br>
+          <span style="color: #ff4757; font-weight: bold; font-size: 0.9rem;">Please wait while we process you document. Ta bom?.</span>
       </div>
-    </div>
   </div>
 
   <input type="file" id="file-picker" style="display:none">

@@ -10,34 +10,35 @@ export default class CalendarManager {
         // Internal State
         this.mode = 0; 
         this.viewDate = new Date(); 
-        this.selectedDate = new Date();
-        this.selectedRange = this._calculateInitialRange(new Date());
         
-        // 1. MOUNT CALLBACK IMMEDIATELY
-        // We store it so we can call it later
+        // --- Store selection as Strings now ---
+        const today = new Date();
+        this.selectedDate = this._formatISO(today); 
+        this.selectedRange = this._calculateInitialRange(today);
+        
         this.onSelectionChange = config.onSelectionChange || null;
 
-        // 2. Initialize controls and initial UI
         this._bindInternalControls();
-
         this._render();
-        
-        // Optional: Trigger initial selection so the app loads data on startup
         this._triggerCallback();
     }
 
     /**
-     * Set the current mode (0: Daily, 1: 2-Weekly, 2: Common)
+     * Helper to get YYYY-MM-DD without timezone shifts
      */
+    _formatISO(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
     setMode(index) {
         this.mode = index;
         this._render();
         this._triggerCallback();
     }
 
-    /**
-     * Internal: Attaches listeners to the prev/next buttons
-     */
     _bindInternalControls() {
         if (this.prevBtn) {
             this.prevBtn.onclick = () => {
@@ -53,16 +54,13 @@ export default class CalendarManager {
         }
     }
 
-    /**
-     * Returns the current selection based on mode
-     */
     _getSelection() {
-        const selection = { mode: this.mode, value: null };
+        const selection = { mode: this.mode, arg: null };
         
         if (this.mode === 0) {
-            selection.value = this.selectedDate;
+            selection.arg = this.selectedDate; // Returns "2026-02-18"
         } else if (this.mode === 1) {
-            selection.value = this.selectedRange;
+            selection.arg = this.selectedRange; // Returns "2026-02-01-14"
         }
         
         return selection;
@@ -98,19 +96,31 @@ export default class CalendarManager {
         for (let day = 1; day <= lastDate; day++) {
             const cell = document.createElement("div");
             const cellDate = new Date(year, month, day);
+            const cellDateStr = this._formatISO(cellDate);
+            
             cell.className = "cal-day";
             cell.textContent = day;
 
-            if (this.mode < 2 && cellDate.toDateString() === new Date().toDateString()) {
+            // Highlight Today
+            if (this.mode < 2 && cellDateStr === this._formatISO(new Date())) {
                 cell.classList.add("today");
             }
 
-            if (this.mode === 0 && cellDate.toDateString() === this.selectedDate.toDateString()) {
+            // Highlight Selected Day (Mode 0)
+            if (this.mode === 0 && cellDateStr === this.selectedDate) {
                 cell.classList.add("selected");
             }
 
+            // Highlight Selected Range (Mode 1)
             if (this.mode === 1 && this.selectedRange) {
-                if (cellDate >= this.selectedRange[0] && cellDate <= this.selectedRange[1]) {
+                // Parse the range string (YYYY-MM-DD-DD) to check if cell falls within it
+                const parts = this.selectedRange.split('-');
+                const startDay = parseInt(parts[2]);
+                const endDay = parseInt(parts[3]);
+                const rangeMonth = parseInt(parts[1]) - 1;
+                const rangeYear = parseInt(parts[0]);
+
+                if (month === rangeMonth && year === rangeYear && day >= startDay && day <= endDay) {
                     cell.classList.add("selected");
                 }
             }
@@ -124,7 +134,7 @@ export default class CalendarManager {
         const clickedDate = new Date(this.viewDate.getFullYear(), this.viewDate.getMonth(), day);
 
         if (this.mode === 0) {
-            this.selectedDate = clickedDate;
+            this.selectedDate = this._formatISO(clickedDate);
         } else if (this.mode === 1) {
             this.selectedRange = this._calculateInitialRange(clickedDate);
         }
@@ -133,19 +143,22 @@ export default class CalendarManager {
         this._triggerCallback();
     }
 
+    /**
+     * Now returns string like "2026-02-01-14"
+     */
     _calculateInitialRange(date) {
         const y = date.getFullYear();
-        const m = date.getMonth(); // 0 = Jan, 1 = Feb...
+        const m = date.getMonth(); 
         const d = date.getDate();
+        const monthStr = String(m + 1).padStart(2, '0');
 
-        // Determine the split day: 14 for February, 15 for all other months
         const splitDay = (m === 1) ? 14 : 15;
 
         if (d <= splitDay) {
-            return [new Date(y, m, 1), new Date(y, m, splitDay)];
+            return `${y}-${monthStr}-01-${String(splitDay).padStart(2, '0')}`;
         } else {
             const lastDay = new Date(y, m + 1, 0).getDate();
-            return [new Date(y, m, splitDay + 1), new Date(y, m, lastDay)];
+            return `${y}-${monthStr}-${String(splitDay + 1).padStart(2, '0')}-${lastDay}`;
         }
     }
 

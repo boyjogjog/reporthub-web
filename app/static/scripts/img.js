@@ -3,10 +3,16 @@
  * Modes: 0 - Explorer, 1 - Attach
  */
 export default class ImageManager {
-    constructor() {
+    constructor(config = {}) {
         this.selectedUuids = [];
-        this.callbacks = { attach: null, copy: null, delete: null };
-        
+        this.callbacks = { attach: null, close: null };
+
+        // Dependency Injection for statelessness
+        this.handlers = {
+            onFetchFolders: config.onFetchFolders || (async () => []),
+            onFetchImages: config.onFetchImages || (async () => [])
+        };
+
         // Modal DOM Cache
         this.modal = document.getElementById('gallery-modal');
         this.grid = document.getElementById('image-grid');
@@ -14,19 +20,19 @@ export default class ImageManager {
         this.statusText = document.getElementById('selection-status');
 
         // Modal Buttons
-        this.closeBtn = this.modal.querySelector('.close-btn');
-        this.attachBtn = this.modal.querySelector('.btn-attach');
-        this.copyBtn = this.modal.querySelector('.btn-copy');
-        this.deleteBtn = this.modal.querySelector('.btn-delete');
+        this.closeBtn = this.modal?.querySelector('.close-btn');
+        this.attachBtn = this.modal?.querySelector('.btn-attach');
+        this.copyBtn = this.modal?.querySelector('.btn-copy');
+        this.deleteBtn = this.modal?.querySelector('.btn-delete');
 
         // The Sidebar Widget (Trigger)
         this.sidebarWidget = document.querySelector('.widget.image-bucket');
 
         this._initInternalListeners();
 
-        this.magState = { 
-            scale: 1, targetScale: 1, 
-            x: 0, targetX: 0, 
+        this.magState = {
+            scale: 1, targetScale: 1,
+            x: 0, targetX: 0,
             y: 0, targetY: 0,
             isPanning: false
         };
@@ -34,31 +40,35 @@ export default class ImageManager {
         this._startAnimationLoop();
     }
 
+    setDepartment(depart) {
+        this.department = depart;
+    }
+
     _initInternalListeners() {
-        // 1. Sidebar Widget Click
         if (this.sidebarWidget) {
             this.sidebarWidget.style.cursor = 'pointer';
-            this.sidebarWidget.onclick = () => this.open(0); 
+            this.sidebarWidget.onclick = () => this.open(0);
         }
 
-        // 2. Modal Controls
-        if (this.closeBtn)  this.closeBtn.onclick = () => this.close();
+        if (this.closeBtn) this.closeBtn.onclick = () => this.close();
         if (this.attachBtn) this.attachBtn.onclick = () => this.handleAction('attach');
-        if (this.copyBtn)   this.copyBtn.onclick = () => this.handleAction('copy');
+        if (this.copyBtn) this.copyBtn.onclick = () => this.handleAction('copy');
         if (this.deleteBtn) this.deleteBtn.onclick = () => this.handleAction('delete');
 
         this.modal.onclick = (e) => {
             if (e.target === this.modal) this.close();
         };
 
-        // 3. Right-Click Magnify delegation
+
         this.grid.addEventListener('contextmenu', (e) => {
             const card = e.target.closest('.img-card');
             if (card) {
-                e.preventDefault(); // Stop standard menu
-                this.magnifyImage(card.dataset.uuid);
+                e.preventDefault();
+                this.magnifyImage(Array.from(this.grid.querySelectorAll('.img-card')).map(c => c.dataset.uuid), card.dataset.uuid);
             }
         });
+
+
         window.addEventListener('keydown', (e) => {
             if (this.isMagnified) {
                 if (e.key === 'Escape') this.closeMagnifier();
@@ -68,24 +78,38 @@ export default class ImageManager {
         });
     }
 
+    /**
+     * Opens the modal and returns a promise that resolves with selected UUIDs
+     */
     async open(mode = 0) {
         this._applyMode(mode);
         this.modal.style.display = 'flex';
         this.grid.innerHTML = '<div class="loader">Accessing bucket...</div>';
-        
+
         try {
-            const response = await fetch('/image-bucket/get-folders');
-            const folders = await response.json();
+            const folders = await this.handlers.onFetchFolders();
             this._renderFolders(folders);
         } catch (err) {
+            console.error("ImageManager Fetch Error:", err);
             this.grid.innerHTML = '<div class="error-state">Failed to reach server.</div>';
         }
+
+        // Only return a Promise if we are in "Attach" mode
+        if (mode === 1) {
+            return new Promise((resolve) => {
+                this.callbacks.attach = (uuids) => resolve(uuids);
+                this.callbacks.close = () => resolve([]);
+            });
+        }
+
+        // Mode 0 (Explorer) just finishes here
+        return null;
     }
 
     _applyMode(mode) {
         const isAttach = mode === 1;
         if (this.attachBtn) this.attachBtn.style.display = isAttach ? 'inline-flex' : 'none';
-        if (this.copyBtn)   this.copyBtn.style.display = isAttach ? 'none' : 'inline-flex';
+        if (this.copyBtn) this.copyBtn.style.display = isAttach ? 'none' : 'inline-flex';
         if (this.deleteBtn) this.deleteBtn.style.display = isAttach ? 'none' : 'inline-flex';
     }
 
@@ -94,12 +118,31 @@ export default class ImageManager {
             alert("Please select images first.");
             return;
         }
-        if (this.callbacks[type]) this.callbacks[type](this.selectedUuids);
+
+        if (type === 'copy') {
+            this._downloadCopySelectedImages();
+        }
+        else if (type === 'delete') {
+            this._deleteSelectedImages();
+        }
+        else if (this.callbacks[type]) {
+            this.callbacks[type]([...this.selectedUuids]);
+        }
+
         if (type === 'attach') this.close();
     }
 
     close() {
         this.modal.style.display = 'none';
+
+        // Trigger resolution of the 'open' promise if it hasn't been already
+        if (this.callbacks.close) {
+            this.callbacks.close();
+        }
+
+        // Cleanup
+        this.callbacks.attach = null;
+        this.callbacks.close = null;
         this.grid.innerHTML = '';
         this.folderList.innerHTML = '';
         this.selectedUuids = [];
@@ -134,28 +177,26 @@ export default class ImageManager {
         this._updateFooter();
 
         try {
-            const res = await fetch(`/image-bucket/get-list/${encodeURIComponent(folderPath)}`);
-            const uuids = await res.json();
+            const uuids = await this.handlers.onFetchImages(folderPath);
 
             if (!uuids?.length) {
                 this.grid.innerHTML = '<div class="empty-state">No images here.</div>';
                 return;
             }
 
-            // HTML remains clean; Logic is handled via JS listeners
+            // 1. Added draggable="true" to the card
             this.grid.innerHTML = uuids.map(uuid => `
-                <div class="img-card" data-uuid="${uuid}" title="Right-click to magnify">
-                    <img src="/image-bucket/get-image/${uuid}?thumb=true" loading="lazy">
-                    <div class="select-badge">✓</div>
-                </div>
-            `).join('');
+            <div class="img-card" data-uuid="${uuid}" draggable="true" title="Drag to desktop or Right-click to magnify">
+                <img src="/image-bucket/get-image/${uuid}?thumb=true" loading="eager" draggable="false">
+                <div class="select-badge">✓</div>
+            </div>
+        `).join('');
 
-            // Click to Select Logic
             this.grid.querySelectorAll('.img-card').forEach(card => {
+                // --- Keep your existing selection logic ---
                 card.onclick = () => {
                     const uuid = card.dataset.uuid;
                     const idx = this.selectedUuids.indexOf(uuid);
-                    
                     if (idx > -1) {
                         this.selectedUuids.splice(idx, 1);
                         card.classList.remove('selected');
@@ -165,16 +206,38 @@ export default class ImageManager {
                     }
                     this._updateFooter();
                 };
+
+                // --- New Drag and Drop Logic ---
+                card.addEventListener('dragstart', (e) => {
+                    const uuid = card.dataset.uuid;
+                    const fullResUrl = `${window.location.origin}/image-bucket/get-image/${uuid}`;
+                    const fileName = `${uuid}.jpg`;
+
+                    // The 'DownloadURL' MUST be in this exact format with the exact mime-type
+                    // format -> mime:fileName:absoluteURL
+                    const downloadData = `image/jpeg:${fileName}:${fullResUrl}`;
+
+                    e.dataTransfer.setData('DownloadURL', downloadData);
+                    e.dataTransfer.setData('text/uri-list', fullResUrl);
+
+                    // Some older grids look for the file name in the 'text/plain' slot
+                    e.dataTransfer.setData('text/plain', fullResUrl);
+                });
+
+                card.addEventListener('dragend', () => {
+                    card.style.opacity = '1';
+                });
             });
         } catch (e) {
             this.grid.innerHTML = '<div class="error-state">Network Error</div>';
         }
     }
+    // --- Magnifier Logic ---
 
-    magnifyImage(uuid) {
+    magnifyImage(targetMagnifiableUuids, uuid) {
         this.isMagnified = true;
-        this.currentUuidsInFolder = Array.from(this.grid.querySelectorAll('.img-card')).map(c => c.dataset.uuid);
-        this.currentIndex = this.currentUuidsInFolder.indexOf(uuid);
+        this.currentMagnifiableUuids = targetMagnifiableUuids;
+        this.currentIndex = this.currentMagnifiableUuids.indexOf(uuid);
 
         let overlay = document.getElementById('image-magnifier');
         if (!overlay) {
@@ -213,21 +276,15 @@ export default class ImageManager {
             img.style.cursor = 'grabbing';
         };
 
-        // Attach to window so pan doesn't break if mouse leaves image
         window.addEventListener('mousemove', (e) => {
             if (!this.magState.isPanning || !this.isMagnified) return;
-
             let nx = e.clientX - this.magState.startX;
             let ny = e.clientY - this.magState.startY;
-
             const bounds = this._getBounds(img, viewport);
-            
-            // Elastic Resistance
             if (nx < bounds.minX) nx = bounds.minX + (nx - bounds.minX) * 0.3;
             if (nx > bounds.maxX) nx = bounds.maxX + (nx - bounds.maxX) * 0.3;
             if (ny < bounds.minY) ny = bounds.minY + (ny - bounds.minY) * 0.3;
             if (ny > bounds.maxY) ny = bounds.maxY + (ny - bounds.maxY) * 0.3;
-
             this.magState.targetX = nx;
             this.magState.targetY = ny;
         });
@@ -247,15 +304,9 @@ export default class ImageManager {
     _getBounds(img, viewport) {
         const vRect = viewport.getBoundingClientRect();
         const iRect = img.getBoundingClientRect();
-        
-        // Calculate how much the image overflows the viewport
         const overflowX = Math.max(0, (iRect.width - vRect.width) / 2);
         const overflowY = Math.max(0, (iRect.height - vRect.height) / 2);
-
-        return {
-            minX: -overflowX, maxX: overflowX,
-            minY: -overflowY, maxY: overflowY
-        };
+        return { minX: -overflowX, maxX: overflowX, minY: -overflowY, maxY: overflowY };
     }
 
     _snapBack(img, viewport) {
@@ -267,57 +318,41 @@ export default class ImageManager {
     }
 
     _updateMagnifierContent() {
-        const uuid = this.currentUuidsInFolder[this.currentIndex];
+        const uuid = this.currentMagnifiableUuids[this.currentIndex];
         const magImg = document.getElementById('mag-img');
         if (!magImg) return;
 
-        // 1. Find the thumbnail already rendered in your grid
         const thumbElement = this.grid.querySelector(`[data-uuid="${uuid}"] img`);
-        
-        // 2. Immediate Feedback: Use the thumb source right away
         if (thumbElement) {
             magImg.src = thumbElement.src;
-            magImg.style.opacity = '1'; // Show immediately
-            magImg.style.filter = 'blur(4px)'; // Optional: slight blur so pixelation looks intentional
+            magImg.style.opacity = '1';
+            magImg.style.filter = 'blur(4px)';
         } else {
             magImg.style.opacity = '0';
         }
 
-        // Reset state immediately so controls work even while loading high-res
-        this.magState = { 
-            scale: 1, targetScale: 1, 
-            x: 0, targetX: 0, 
+        this.magState = {
+            scale: 1, targetScale: 1,
+            x: 0, targetX: 0,
             y: 0, targetY: 0,
-            isPanning: false,
-            startX: 0, startY: 0
+            isPanning: false, startX: 0, startY: 0
         };
 
-        // 3. Load High-Res in background
         const highResUrl = `/image-bucket/get-image/${uuid}`;
         const highResLoader = new Image();
-        
         highResLoader.onload = () => {
-            // Only update if the user hasn't navigated away to a different image already
-            if (this.currentUuidsInFolder[this.currentIndex] === uuid) {
+            if (this.currentMagnifiableUuids[this.currentIndex] === uuid) {
                 magImg.src = highResUrl;
-                magImg.style.filter = 'none'; // Remove blur
+                magImg.style.filter = 'none';
                 magImg.style.opacity = '1';
             }
         };
-        
         highResLoader.src = highResUrl;
-    }
-
-    _applyMagTransform() {
-        const img = document.getElementById('mag-img');
-        if (img) {
-            img.style.transform = `translate(${this.magState.x}px, ${this.magState.y}px) scale(${this.magState.scale})`;
-        }
     }
 
     navigateMagnifier(direction) {
         const newIdx = this.currentIndex + direction;
-        if (newIdx >= 0 && newIdx < this.currentUuidsInFolder.length) {
+        if (newIdx >= 0 && newIdx < this.currentMagnifiableUuids.length) {
             this.currentIndex = newIdx;
             this._updateMagnifierContent();
         }
@@ -331,15 +366,12 @@ export default class ImageManager {
 
     _startAnimationLoop() {
         const animate = () => {
-            // Only do work if we are actually looking at a magnified image
             if (this.isMagnified) {
                 const img = document.getElementById('mag-img');
                 if (img && this.magState) {
-                    // Smoothly interpolate current values toward targets
                     this.magState.scale += (this.magState.targetScale - this.magState.scale) * 0.15;
                     this.magState.x += (this.magState.targetX - this.magState.x) * 0.15;
                     this.magState.y += (this.magState.targetY - this.magState.y) * 0.15;
-
                     img.style.transform = `translate(${this.magState.x}px, ${this.magState.y}px) scale(${this.magState.scale})`;
                 }
             }
@@ -354,7 +386,104 @@ export default class ImageManager {
         }
     }
 
-    onAttach(cb) { this.callbacks.attach = cb; }
-    onCopy(cb)   { this.callbacks.copy = cb; }
+    async _downloadCopySelectedImages() {
+
+        try {
+            const uuids = [...this.selectedUuids];
+
+            if (!window.pywebview) {
+                this._notify("Desktop environment not detected.");
+                return;
+            }
+
+            this._notify("Preparing images...");
+
+            const result = await window.pywebview.api
+                .download_copy_to_clipboard(uuids, this.department.toLowerCase());
+
+            if (result.status === "success") {
+                this._notify(
+                    `${result.count} images ready. Press Ctrl + V to paste.`
+                );
+                this.showSnackbar(`✅ ${result.count} images ready. Press Ctrl + V to paste anywhere.`);
+            } else {
+                this._notify(result.message || "Operation failed.");
+            }
+
+        } catch (err) {
+            alert(err);
+            console.error("Clipboard operation failed:", err);
+            this._notify("Something went wrong.");
+        }
+    }
+
+    async _deleteSelectedImages() {
+        const uuids = [...this.selectedUuids];
+
+        if (!confirm(`Delete ${uuids.length} image(s)?`)) return;
+
+        this._notify("Validating and deleting images...");
+
+        let deletedCount = 0;
+
+        for (const uuid of uuids) {
+            try {
+                const res = await fetch(`/image-bucket/delete-image/${uuid}`, {
+                    method: 'DELETE'
+                });
+
+                // If the backend says NO (e.g., image is in a report)
+                if (res.status === 400) {
+                    const data = await res.json();
+
+                    // Alert the user and STOP the entire loop
+                    alert(`Cannot complete deletion: ${data.detail || 'One or more images are in use.'}`);
+                    this._notify("Deletion halted: Safety constraint met.");
+                    break;
+                }
+
+                if (res.ok) {
+                    deletedCount++;
+                } else {
+                    console.error(`Failed to delete ${uuid}: ${res.statusText}`);
+                }
+
+            } catch (err) {
+                console.error("Network or system error:", err);
+                this._notify("An error occurred during deletion.");
+                break;
+            }
+        }
+
+        // UI Updates
+        if (deletedCount > 0) {
+            this._notify(`${deletedCount} image(s) deleted.`);
+
+            // Only reset selection and refresh if something actually happened
+            this.selectedUuids = [];
+            this._updateFooter();
+
+            const activeFolder = this.folderList.querySelector('.folder-item.active');
+            if (activeFolder) {
+                await this._fetchImages(activeFolder.dataset.path);
+            }
+        }
+    }
+
+    _notify(msg) {
+        if (this.statusText) this.statusText.innerText = msg;
+        setTimeout(() => this._updateFooter(), 3000);
+    }
+
+    // Callbacks for external usage
+    onCopy(cb) { this.callbacks.copy = cb; }
     onDelete(cb) { this.callbacks.delete = cb; }
+
+    showSnackbar(message) {
+        const snack = document.getElementById("snackbar");
+        if (!snack) return;
+        snack.textContent = message;
+        snack.className = "show";
+        setTimeout(() => { snack.className = snack.className.replace("show", ""); }, 3000);
+    }
 }

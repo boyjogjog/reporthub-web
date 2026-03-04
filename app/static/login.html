@@ -45,14 +45,14 @@
     .logo {
       text-align: center;
       font-size: 32px;
-      font-weight: 700;
+      font-weight: 600;
       margin-bottom: 32px;
     }
     .logo span:first-child { color: #0f172a; }
     .logo span:last-child {
       background: var(--dark-navy);
       color: #fff;
-      padding: 4px 12px;
+      padding: 2px 6px;
       border-radius: 8px;
       margin-left: 4px;
     }
@@ -76,7 +76,7 @@
       padding: 4px;
       position: relative;
       width: 100%;
-      height: 40px;
+      height: 46px;
     }
 
     .segmented button {
@@ -96,11 +96,12 @@
     .selection-slider {
       position: absolute;
       top: 4px; left: 4px; bottom: 4px;
-      width: calc(25% - 2px); /* 4 buttons = 25% each */
+      width: calc(25% - 2px); 
       background: var(--dark-navy);
       border-radius: 7px;
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
       z-index: 1;
+      opacity: 0; /* Hidden until first click */
     }
 
     /* 4. INPUTS & BUTTONS */
@@ -148,12 +149,36 @@
       font-size: 11px;
       color: #94a3b8;
     }
+
+    .inspired-by {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: -16px;
+      margin-bottom: 40px;
+      font-size: 12px;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    .flet-logo {
+      width: 16px;
+      height: 16px;
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body>
 
   <div class="login-shell">
     <div class="logo"><span>Report</span><span>hub</span></div>
+
+    <div class="inspired-by">
+      inspired by 
+      <img src="https://flet.dev/img/logo.svg" alt="Flet logo" class="flet-logo">
+      <span style="color: #000000; font-weight: 700;">Flet</span>
+    </div>
 
     <form id="loginForm">
       <select id="department" style="display:none;" required>
@@ -168,7 +193,7 @@
         <label>Select Department</label>
         <div class="segmented" id="deptSwitcher">
           <div id="segmented-slider" class="selection-slider"></div>
-          <button type="button" data-val="deck" class="active">Deck</button>
+          <button type="button" data-val="deck">Deck</button>
           <button type="button" data-val="electrical">Electrical</button>
           <button type="button" data-val="engine">Engine</button>
           <button type="button" data-val="store">Store</button>
@@ -177,7 +202,7 @@
 
       <div class="field">
         <label>Password</label>
-        <input type="password" id="password" placeholder="••••••••" required />
+        <input type="password" id="password" placeholder="Enter password..." required />
       </div>
 
       <button type="submit" class="btn-signin">Sign In Securely</button>
@@ -190,29 +215,32 @@
   </div>
 
   <script>
-    // --- 1. NEW UI LOGIC (Switching the hidden select) ---
+    // --- 1. UI LOGIC (No initial selection) ---
     const buttons = document.querySelectorAll('#deptSwitcher button');
     const slider = document.getElementById('segmented-slider');
     const hiddenSelect = document.getElementById('department');
 
     buttons.forEach((btn, index) => {
       btn.onclick = () => {
-        // Move slider
+        // Show blue slider background on first click
+        slider.style.opacity = '1';
+        
+        // Move slider to clicked button
         slider.style.transform = `translateX(${index * 100}%)`;
         
-        // Update active class
+        // Swap text colors
         buttons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
 
-        // Update the actual hidden select value for your existing JS
+        // Link to the real hidden select
         hiddenSelect.value = btn.getAttribute('data-val');
       };
     });
 
-    // Initialize default value
-    hiddenSelect.value = "deck";
+    // Start with empty value for validation
+    hiddenSelect.value = "";
 
-    // --- 2. YOUR ORIGINAL JS LOGIC (Untouched) ---
+    // --- 2. AUTH LOGIC ---
     window.onload = () => {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('expired') === 'true') {
@@ -227,9 +255,16 @@
 
     document.getElementById('loginForm').onsubmit = async (e) => {
       e.preventDefault();
-      const dept = document.getElementById('department').value;
-      const pass = document.getElementById('password').value;
+      
+      const dept = hiddenSelect.value;
+      if (!dept) {
+        const msg = document.getElementById('errorMessage');
+        msg.innerText = "Please select a department.";
+        msg.style.display = 'block';
+        return;
+      }
 
+      const pass = document.getElementById('password').value;
       const formData = new URLSearchParams();
       formData.append('username', dept);
       formData.append('password', pass);
@@ -242,9 +277,7 @@
         });
 
         if (resp.ok) {
-          const urlParams = new URLSearchParams(window.location.search);
-          const nextPath = urlParams.get('next');
-          window.location.href = nextPath ? decodeURIComponent(nextPath) : '/home';
+          window.location.href = '/home';
         } else {
           const msg = document.getElementById('errorMessage');
           msg.innerText = "Invalid department or password.";

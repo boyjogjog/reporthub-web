@@ -1,0 +1,2 @@
+SSE_SESSIONS = {}
+SEARCH_TASKS = {}

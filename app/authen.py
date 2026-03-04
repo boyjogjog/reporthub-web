@@ -6,7 +6,7 @@ from jose import JWTError, jwt
 SECRET_KEY = "my-very-secret-key"
 ALGORITHM = "HS256"
 # Standardizing to seconds (1 hour = 3600 seconds)
-ACCESS_TOKEN_EXPIRE_SECONDS = 60 * 60 
+ACCESS_TOKEN_EXPIRE_SECONDS = 24 * 60 * 60 # 24 hours
 
 
 # ---------------------------

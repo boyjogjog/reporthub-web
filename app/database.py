@@ -66,36 +66,44 @@ def get_app_db() -> Generator[Session, None, None]:
     try: yield db
     finally: db.close()
 
-async def get_dept_context(auth: dict = Depends(get_auth_data)) -> Generator[tuple[Session, Path], None, None]:
+async def get_dept_context(auth: dict = Depends(get_auth_data)) -> Generator[tuple[Session, dict], None, None]:
     dept_name = auth["sub"].lower()
-    #dept_name = 'engine'
     res = get_dept_resources(dept_name)
-    bucket_path = res["image-bucket"]
+    
     db = res["sessionmaker"]()
     try:
-        yield  db, bucket_path
+        # Yield the whole 'res' dict so we can access any folder we need
+        yield db, res 
     finally:
         db.close()
 
 
 def get_dept_resources(dept_name: str):
-    """Initializes and returns isolated DB and storage for a tenant."""
     name = dept_name.lower()
     if name not in DEPT_CACHE:
         path = DEPT_DIR / name
-        bucket = path / "image-bucket"
-        bucket.mkdir(parents=True, exist_ok=True)
+        
+        # Define all required paths
+        resources = {
+            "image-bucket": path / "image-bucket",
+            "reports-daily": path / "reports" / "daily",
+            "reports-weekly": path / "reports" / "2-weekly"
+        }
+        
+        # Create directories
+        resources["image-bucket"].mkdir(parents=True, exist_ok=True)
+        resources["reports-daily"].mkdir(parents=True, exist_ok=True)
+        resources["reports-weekly"].mkdir(parents=True, exist_ok=True)
         
         engine = create_engine(
             f"sqlite:///{path / f'data-{name}.db'}", 
             connect_args={"check_same_thread": False}
         )
-        # ONLY create department-specific tables here
         DeptBase.metadata.create_all(bind=engine)
         
         DEPT_CACHE[name] = {
             "sessionmaker": sessionmaker(bind=engine),
-            "image-bucket": bucket
+            **resources # Merge paths into the cache
         }
     return DEPT_CACHE[name]
 

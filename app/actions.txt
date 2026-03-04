@@ -3,92 +3,14 @@ python3 -m venv .venv
 pip install fastapi uvicorn sqlalchemy python-jose[cryptography] pydantic python-multipart
 source .venv/bin/activate
 uvicorn main:app --host 0.0.0.0 --port 8888 --reload
+uvicorn mainorig:app --host 0.0.0.0 --port 8888 --reload
 uvicorn main:app --workers 4 --host 0.0.0.0 --port 8888
 lsof -i :8888
 kill -9 <PID>
 
 
-ecr@aquarius:~/reporthub$ source .venv/bin/activate
-(.venv) ecr@aquarius:~/reporthub$ cd app
-(.venv) ecr@aquarius:~/reporthub/app$ uvicorn main:app --host 0.0.0.0 --port 8888 --reload
-INFO:     Will watch for changes in these directories: ['/home/ecr/reporthub/app']
-INFO:     Uvicorn running on http://0.0.0.0:8888 (Press CTRL+C to quit)
-INFO:     Started reloader process [1202401] using StatReload
-INFO:     Started server process [1202403]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-WARNING:  StatReload detected changes in 'main.py'. Reloading...
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [1202403]
-INFO:     Started server process [1202641]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-WARNING:  StatReload detected changes in 'main.py'. Reloading...
-INFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [1202641]
-INFO:     Started server process [1202825]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-^CINFO:     Shutting down
-INFO:     Waiting for application shutdown.
-INFO:     Application shutdown complete.
-INFO:     Finished server process [1202825]
-INFO:     Stopping reloader process [1202401]
-(.venv) ecr@aquarius:~/reporthub/app$ pwd
-/home/ecr/reporthub/app
-(.venv) ecr@aquarius:~/reporthub/app$ which gunicorn
-(.venv) ecr@aquarius:~/reporthub/app$ cd ..
-(.venv) ecr@aquarius:~/reporthub$ pip install gunicorn
-Collecting gunicorn
-  Downloading gunicorn-25.1.0-py3-none-any.whl.metadata (5.5 kB)
-Collecting packaging (from gunicorn)
-  Downloading packaging-26.0-py3-none-any.whl.metadata (3.3 kB)
-Downloading gunicorn-25.1.0-py3-none-any.whl (197 kB)
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 197.1/197.1 kB 2.8 MB/s eta 0:00:00
-Downloading packaging-26.0-py3-none-any.whl (74 kB)
-   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 74.4/74.4 kB 8.2 MB/s eta 0:00:00
-Installing collected packages: packaging, gunicorn
-Successfully installed gunicorn-25.1.0 packaging-26.0
-(.venv) ecr@aquarius:~/reporthub$ sudo nano /etc/systemd/system/reporthub.service
-[sudo] password for ecr: 
-(.venv) ecr@aquarius:~/reporthub$ sudo systemctl daemon-reload
-(.venv) ecr@aquarius:~/reporthub$ sudo systemctl start reporthub
-(.venv) ecr@aquarius:~/reporthub$ sudo systemctl enable reporthub
-Created symlink /etc/systemd/system/multi-user.target.wants/reporthub.service → /etc/systemd/system/reporthub.service.
-(.venv) ecr@aquarius:~/reporthub$ sudo systemctl status reporthub
-● reporthub.service - Gunicorn instance to serve Reporthub FastAPI
-     Loaded: loaded (/etc/systemd/system/reporthub.service; enabled; preset: enabled)
-     Active: active (running) since Tue 2026-02-17 02:58:35 -03; 32s ago
-   Main PID: 1226226 (gunicorn)
-      Tasks: 3 (limit: 2267)
-     Memory: 64.8M (peak: 65.1M)
-        CPU: 982ms
-     CGroup: /system.slice/reporthub.service
-             ├─1226226 /home/ecr/reporthub/.venv/bin/python3 /home/ecr/reporthub/.venv/bin/gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8888 --timeout 120
-             └─1226232 /home/ecr/reporthub/.venv/bin/python3 /home/ecr/reporthub/.venv/bin/gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8888 --timeout 120
 
-Feb 17 02:58:35 aquarius systemd[1]: Started reporthub.service - Gunicorn instance to serve Reporthub FastAPI.
-Feb 17 02:58:35 aquarius gunicorn[1226226]: [2026-02-17 02:58:35 -0300] [1226226] [INFO] Starting gunicorn 25.1.0
-Feb 17 02:58:35 aquarius gunicorn[1226226]: [2026-02-17 02:58:35 -0300] [1226226] [INFO] Listening at: http://0.0.0.0:8888 (1226226)
-Feb 17 02:58:35 aquarius gunicorn[1226226]: [2026-02-17 02:58:35 -0300] [1226226] [INFO] Using worker: uvicorn.workers.UvicornWorker
-Feb 17 02:58:35 aquarius gunicorn[1226232]: [2026-02-17 02:58:35 -0300] [1226232] [INFO] Booting worker with pid: 1226232
-Feb 17 02:58:35 aquarius gunicorn[1226226]: [2026-02-17 02:58:35 -0300] [1226226] [INFO] Control socket listening at /home/ecr/reporthub/app/gunicorn.ctl
-Feb 17 02:58:36 aquarius gunicorn[1226232]: [2026-02-17 02:58:36 -0300] [1226232] [INFO] Started server process [1226232]
-Feb 17 02:58:36 aquarius gunicorn[1226232]: [2026-02-17 02:58:36 -0300] [1226232] [INFO] Waiting for application startup.
-Feb 17 02:58:36 aquarius gunicorn[1226232]: [2026-02-17 02:58:36 -0300] [1226232] [INFO] Application startup complete.
-(.venv) ecr@aquarius:~/reporthub$ 
-
-
-
-
-
-to reload the modified code
 sudo systemctl restart reporthub
 sudo systemctl stop reporthub
 sudo systemctl start reporthub
-
-Stopsudo systemctl stop reporthubShutting down for maintenance.Startsudo systemctl start reporthubBringing the app back online.Restartsudo systemctl restart reporthubApplying code changes (Stop + Start).Statussudo systemctl status reporthubChecking if it's currently running or crashed.
+sudo systemctl daemon-reload

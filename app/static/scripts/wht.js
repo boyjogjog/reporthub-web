@@ -1,9 +1,23 @@
 /**
  * WhiteboardManager - Handles the report editor, data loading, and saving.
+ * * CORE CONCEPT:
+ * This class manages a contentEditable list where each <li> represents a database record.
+ * It handles "Daily", "2-Weekly", and "Common" modes, adjusting the UI and buttons 
+ * based on the active report type.
  */
 export default class WhiteboardManager {
-    constructor() {
-        this.selection = null;
+
+    /**
+     * CONSTRUCTOR
+     * 1. Maps all UI elements (buttons, editor, modals) to the class instance.
+     * 2. Initializes the attachment queue for handling image uploads.
+     * 3. Triggers the listener setup.
+     */
+    constructor(handlers) {
+        this.context = null;
+        this.handlers = handlers;
+
+        // UI Element Mapping
         this.editor = document.getElementById('editor');
         this.headerSpan = document.querySelector('.header-left span:last-child');
         this.btns = {
@@ -14,103 +28,86 @@ export default class WhiteboardManager {
             export: document.getElementById('btn-export')
         };
 
-        this.decisionModal = document.getElementById('decision-modal');
-        this.btnDetach = document.getElementById('btn-detach-confirm');
-        this.btnDelete = document.getElementById('btn-delete-confirm');
-        this.btnCancel = document.getElementById('btn-cancel-confirm');
-
-        // Callback registry for external logic
-        this.callbacks = {};
-
-        this.highlighter = null;
-        this.activeLi = null;
-
+        // State Tracking
+        this.highlighter = null; // Visual bar indicating active row
+        this.activeLi = null;    // Reference to the currently focused <li>
         this._attachmentQueue = [];
         this._isProcessingQueue = false;
 
-        // Make sure this ID matches your HTML exactly
         this.whiteboard = document.getElementById('whiteboard');
-
-        if (!this.whiteboard) {
-            console.error("Whiteboard element not found during initialization!");
-        }
-        // ... other initializations
 
         this._initListeners();
     }
 
     /**
-     * External hook to register listeners for button clicks
-     * @param {string} btnKey - 'save', 'attach', 'send', 'import', 'export'
-     * @param {function} fn - The function to run
+     * ENTRY POINT FOR LISTENERS
+     * Distinguishes between internal editor behavior (typing/clicking) 
+     * and external toolbar behavior (button clicks).
      */
-    onButtonClick(btnKey, fn) {
-        if (this.btns[btnKey]) {
-            this.callbacks[btnKey] = fn;
-        }
+    _initListeners() {
+        this._initEditorListeners();
+        this._initButtonListeners();
     }
 
-    _initListeners() {
-        // Internal Editor Logic
-        this.editor.addEventListener('click', () => setTimeout(() => this.moveHighlighter(), 0));
-        this.editor.addEventListener('input', () => {
-            this.setDirty(true); // Any change makes it dirty
-            this.moveHighlighter();
-        });
-        this.editor.addEventListener('keydown', (e) => this._handleKeyDown(e));
+    /**
+     * EDITOR INTERACTION LISTENERS
+     * Syncs the "Highlighter" position with the user's cursor.
+     * Marks the document as "dirty" (unsaved) whenever text changes.
+     */
+    _initEditorListeners() {
+        // Sync highlighter on click
+        this.editor.addEventListener('click', () =>
+            setTimeout(() => this._moveHighlighter(), 0)
+        );
 
-        document.addEventListener('mousedown', (e) => {
-            if (!this.editor.contains(e.target) && this.highlighter) {
-                this.highlighter.style.opacity = "0";
+        // Track changes and mark as unsaved
+        this.editor.addEventListener('input', () => {
+            this._setDirty(true);
+            this._moveHighlighter();
+        });
+
+        this.editor.addEventListener('paste', () => {
+            this._setDirty(true);
+            setTimeout(() => this._moveHighlighter(), 0);
+        });
+
+        // Redirect keyboard inputs (Enter/Shift+Enter logic)
+        this.editor.addEventListener('keydown', e =>
+            this._handleKeyDown(e)
+        );
+
+    }
+
+    /**
+     * TOOLBAR BUTTON LISTENERS
+     * Maps the visual buttons to the "handlers" passed from the main app.
+     * Each button builds a "payload" (current state of the editor) before executing.
+     */
+    _initButtonListeners() {
+        this.btns.save?.addEventListener('click', async () => {
+            if (!this.handlers.onSave) return;
+            const payload = this._getPayload();
+            if (await this.handlers.onSave(this.context, payload)) {
+                this._setDirty(false);
+                this._clearCache(this.context); // Draft is no longer needed
+                this.showSnackbar("✅ Report saved successfully.");
+            } else {
+                this.showSnackbar("❌ Report save failed.");
             }
         });
 
-
-        // Loop through all buttons and assign click handlers that trigger internal + external logic
-        Object.keys(this.btns).forEach(key => {
-            const btn = this.btns[key];
-            if (!btn) return;
-
-            btn.onclick = async () => {
-                // 1. Run Internal logic (e.g., auto-save on specific buttons)
-                if (key === 'save') {
-                    await this._saveReport();
-                }
-
-                // 2. Trigger External logic if a callback was registered
-                if (this.callbacks[key]) {
-                    // Pass the current state (activeLi, selection) to the external function
-                    this.callbacks[key]({
-                        activeLi: this.activeLi,
-                        selection: this.selection,
-                        items: this._scrapeEditorItems()
-                    });
-                }
-            };
+        this.btns.send?.addEventListener('click', async () => {
+            if (!this.handlers.onSend) return;
+            if (!this.isDirty) {
+                const payload = this._getPayload();
+                await this.handlers.onSend(this.context, payload);
+            }
         });
 
-
-        if (this.highlighter) {
-            this.highlighter.onclick = () => {
-                if (!this.activeLi) return;
-
-                this.activeLi.focus();
-                const range = document.createRange();
-                const sel = window.getSelection();
-
-                // Focus the text node (index 0) and set caret to its end
-                const textNode = this.activeLi.childNodes[0];
-                if (textNode && textNode.nodeType === 3) {
-                    range.setStart(textNode, textNode.length);
-                    range.collapse(true);
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                }
-            };
-        }
-
-        this.btns.import.onclick = () => {
-            if (!this.pendingItems || this.pendingItems.length === 0) return;
+        this.btns.import?.addEventListener('click', async () => {
+            if (!this.handlers.onImport) return;
+            const importables = await this.handlers.onImport();
+            if (!importables || importables === 0) return;
 
             const listElement = this.editor.querySelector('ul, ol');
             if (!listElement) return;
@@ -128,449 +125,166 @@ export default class WhiteboardManager {
             }
 
             // --- APPEND PENDING ITEMS ---
-            this.pendingItems.forEach(item => {
+            importables.forEach(item => {
                 const li = this._createListItem(item, true); // true = centered
                 listElement.appendChild(li);
             });
 
-            // --- RESET UI ---
-            this.pendingItems = [];
             this._updateImportBadge(0);
-            this.setDirty(true);
-        };
-
-        this.btns.export.addEventListener('click', async () => {
-            // 1. Visual Feedback
-            const originalText = this.btns.export.innerText;
-            this.btns.export.innerText = "Generating...";
-            this.btns.export.disabled = true;
-            document.body.style.cursor = 'wait';
-
-            try {
-                // 2. Fetch the stream from your FastAPI endpoint
-                const response = await fetch(`/export-2weekly-report/2026-01-01-15`);
-
-                if (!response.ok) throw new Error('Network response was not ok');
-
-                // 3. Convert the stream to a Blob
-                const blob = await response.blob();
-
-                // 4. Create a temporary local URL for this file
-                const fileUrl = window.URL.createObjectURL(blob);
-
-                // 5. Trigger the download/open
-                const link = document.createElement('a');
-                link.href = fileUrl;
-                link.download = `Weekly_Report_${this.currentRange}.docx`;
-
-                document.body.appendChild(link);
-                link.click();
-
-                // 6. Cleanup
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(fileUrl);
-
-            } catch (error) {
-                console.error('Export Error:', error);
-                alert("Failed to generate report.");
-            } finally {
-                // 7. Reset UI
-                this.btns.export.innerText = originalText;
-                this.btns.export.disabled = false;
-                document.body.style.cursor = 'default';
-            }
+            this._setDirty(true);
         });
 
-        // 1. Define a helper function for copying
-        const copyToClipboard = (text) => {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                return navigator.clipboard.writeText(text);
-            } else {
-                // Fallback for non-HTTPS / IP address access
-                const textArea = document.createElement("textarea");
-                textArea.value = text;
-                document.body.appendChild(textArea);
-                textArea.select();
-                try {
-                    document.execCommand('copy');
-                } catch (err) {
-                    console.error('Fallback copy failed', err);
-                }
-                document.body.removeChild(textArea);
-                return Promise.resolve();
-            }
-        };
+        this.btns.export?.addEventListener('click', async () => {
+            if (!this.handlers.onExport) return;
+            await this.handlers.onExport(this.context);
+        });
 
-        this.btns.send.addEventListener('click', async () => {
-            // 1. Dirty Check
-            if (this.isDirty) {
-                alert("You have unsaved changes! Please save your work before sending.");
+        this.btns.attach?.addEventListener('click', async () => {
+            if (!this.activeLi) {
+                this.showSnackbar("⚠️ Please click a report item first.");
                 return;
             }
-
-            const { mode, value: dateStr } = this.selection;
-            const identifier = dateStr.toISOString().split('T')[0];
-            // 2. Mode Check
-            if (mode !== 0) return;
-
-            try {
-                // 3. Call Backend to Load Report Data
-                // Replace 'YOUR_BACKEND_URL' with your actual API URL (e.g., http://your-vm-ip:8000)
-                const loadResponse = await fetch(`/load-daily-report/${identifier}`);
-                const reports = await loadResponse.json();
-
-                if (reports && reports.length > 0) {
-                    // 4. Extract text_content and format as bulleted list
-                    const clipboardText = reports
-                        .map(r => `${r.text_content}`)
-                        .join('\n');
-
-                    // 5. Copy to Clipboard
-                    await copyToClipboard(clipboardText);
-                    console.log("Copied to clipboard via fallback.");
-                } else {
-                    console.warn("No reports found for this date. Clipboard remains unchanged.");
-                }
-
-                // 6. Build File Path for Word Doc
-                const dateObj = new Date(dateStr);
-                const year = dateObj.getFullYear();
-                const monthFull = dateObj.toLocaleString('en-US', { month: 'long' });
-                const monthNum = dateObj.getMonth() + 1;
-
-                const dd = String(dateObj.getDate()).padStart(2, '0');
-                const mm = String(monthNum).padStart(2, '0');
-                const yy = String(year).slice(-2);
-
-                const filePath = `N:/14. REPORTS/DAILY REPORTS/${year}/${monthNum} ${monthFull} ${year}/Daily activities report ${dd}.${mm}.${yy}.docx`;
-
-                // 7. Call Python Helper to open Word
-                const openUrl = `http://127.0.0.1:5005/open-file?path=${encodeURIComponent(filePath)}`;
-                const openResponse = await fetch(openUrl);
-                const openResult = await openResponse.json();
-
-                if (openResult.status === "success") {
-                    console.log("Success! Word is opening. You can now paste (Ctrl+V).");
-                } else {
-                    alert("Helper Error: " + openResult.message);
-                }
-
-            } catch (error) {
-                console.error("Workflow failed:", error);
-                alert("Error during report sync. Ensure both Backend and Local Helper are running.");
-            }
+            const imageUuids = await this.handlers.onAttach?.();
+            this.attachImagesToActiveLi(imageUuids);
         });
     }
 
     /**
-     * Entry point from Calendar/Mode managers
+     * CONTEXT SWITCHER (The "Brain")
+     * Switches between Daily, 2-Weekly, and Common modes.
+     * 1. Toggles between standard view and "Search Mode".
+     * 2. Updates the header title.
+     * 3. Shows/Hides specific buttons based on mode (e.g., Import only in 2-Weekly).
+     * 4. Triggers data loading from the backend.
      */
-    async updateView(selection) {
-        // 1. Save current work BEFORE selection changes
-        if (this.isDirty && this.selection) {
-            //this._saveReport();
+    async changeContext(context) {
+        // --- DRAFT SAVING LOGIC ---
+        // If the current view is dirty, save it to localStorage before switching
+        if (this.isDirty && this.context && this.context.mode !== 3) {
+            const payload = this._getPayload();
+            this._saveToCache(this.context, payload);
+            this._setDirty(false); // Reset dirty flag as it's now "locally saved"
         }
 
-        this.selection = selection;
-        const { mode, value } = this.selection;
-
-        console.log("Current Mode:", mode);
-
-        // --- Header Toggle Logic ---
-        // Mode 3 shows the search input sibling; others show the standard header
-        this._toggleSearchHeader(mode === 3);
-
-        // Only update standard header text if we aren't in search mode
-        if (mode !== 3) {
-            this._updateHeader(mode, value);
-        }
-
-        // 2. Prepare the parameters for loadReport
-        let type = '';
-        let identifier = '';
-
-        switch (mode) {
-            case 0: // Daily
-                type = 'daily';
-                identifier = value.toISOString().split('T')[0];
-                break;
-
-            case 1: // 2-Weekly
-                type = 'weekly';
-                identifier = this._getSemiMonthlyRangeString(value[0]);
-                break;
-
-            case 2: // Common
-                type = 'common';
-                identifier = 'global';
-                break;
-
-            case 3: // Search History (Special Case)
-                type = 'history';
-                // Here 'value' is the flowInstanceId passed from the search selection
-                identifier = value;
-                break;
-        }
-
-        // 3. Centralized load call
-        if (type && identifier) {
-            await this.loadReport(type, identifier);
-        }
-    }
-
-    /**
-     * Toggles visibility between standard header and search input siblings
-     */
-    _toggleSearchHeader(isSearchMode) {
+        this._setDirty(false);
+        this.context = context;
         const standardHeader = document.getElementById('header-standard');
         const searchHeader = document.getElementById('header-search');
         const headerParent = document.querySelector('.whiteboard-header');
         const editor = document.getElementById('editor');
 
-        if (isSearchMode) {
-            // --- 1. UI Toggle ---
+        // SEARCH MODE LOGIC
+        if (this.context.mode == 3) {
             standardHeader.style.display = 'none';
             searchHeader.style.display = 'flex';
             headerParent.classList.add('search-active');
-
-            // --- 2. Clear & Disable Editor for Search Results ---
-            // We clear everything except the highlighter div
             editor.innerHTML = '<div id="li-highlighter" class="li-highlighter"></div>';
             editor.setAttribute('contenteditable', 'false');
-            editor.classList.add('search-results-view'); // Useful for custom CSS
-
-            // --- 3. Focus Input ---
+            editor.classList.add('search-results-view');
             const input = document.getElementById('history-search-input');
             if (input) {
-                input.value = ''; // Reset search text
+                input.value = '';
                 input.focus();
+                // CATCH ENTER KEY
+                input.onkeydown = async (e) => {
+                    if (e.key === 'Enter') {
+                        const query = e.target.value.trim();
+
+                        if (query.length > 0) {
+                            // --- CLEAR WHITEBOARD HERE ---
+                            // We keep the highlighter div so it doesn't break future interactions,
+                            // and add a placeholder to let the user know the search started.
+                            this.editor.innerHTML = "";
+
+                            // Re-assign the highlighter reference since we just wiped the innerHTML
+                            this.highlighter = document.getElementById('li-highlighter');
+
+                            // Trigger the "drop and forget" handler
+                            this.handlers.onSearch(query);
+                        }
+                    }
+                };
             }
-        } else {
-            // --- 1. UI Toggle ---
+        }
+        // REPORT EDITING MODES
+        else {
+            function formatDateRange(dateStr, full) {
+                if (!dateStr) return "";
+                const parts = dateStr.split('-');
+                const shortMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const fullMonths = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                const year = parts[0];
+                const monthIndex = parseInt(parts[1]) - 1;
+                const month = full ? fullMonths[monthIndex] : `${shortMonths[monthIndex]}.`;
+                const day1 = parts[2];
+                if (parts.length === 4) {
+                    const day2 = parts[3];
+                    return `${month} (${day1}-${day2}), ${year}`;
+                }
+                return `${month} ${day1}, ${year}`;
+            }
+
             standardHeader.style.display = 'flex';
             searchHeader.style.display = 'none';
             headerParent.classList.remove('search-active');
-
-            // --- 2. Re-enable Editor ---
             editor.setAttribute('contenteditable', 'true');
             editor.classList.remove('search-results-view');
 
-            // Note: content will be re-filled by the subsequent this.loadReport() 
-            // call in your updateView function.
-        }
-    }
+            if (!this.headerSpan) return;
 
-    setupSearchListeners(onSearchRequested) {
-        const input = document.getElementById('history-search-input');
-        if (!input) return;
+            // Reset button visibility
+            Object.values(this.btns).forEach(btn => {
+                if (btn && btn.id !== 'btn-save') btn.style.display = 'none';
+            });
 
-        input.addEventListener('keypress', async (e) => {
-            if (e.key === 'Enter') {
-                const query = input.value.trim();
-                if (!query) return;
-
-                // 1. Clear the UI inside the class to prepare for results
-                const editor = document.getElementById('editor');
-                editor.innerHTML = '<div id="li-highlighter" class="li-highlighter"></div>';
-
-                // 2. Execute the external callback
-                if (typeof onSearchRequested === 'function') {
-                    onSearchRequested(query);
-                }
+            if (this.context.mode === 0) { // DAILY
+                this.headerSpan.textContent = `Daily Report: ${formatDateRange(this.context.arg, true)}`;
+                if (this.btns.attach) this.btns.attach.style.display = 'inline-flex';
+                if (this.btns.send) this.btns.send.style.display = 'inline-flex';
+            } else if (this.context.mode === 1) { // 2-WEEKLY
+                this.headerSpan.textContent = `2-Weekly Report: ${formatDateRange(this.context.arg, false)}`;
+                if (this.btns.attach) this.btns.attach.style.display = 'inline-flex';
+                if (this.btns.import) this.btns.import.style.display = 'inline-flex';
+                if (this.btns.export) this.btns.export.style.display = 'inline-flex';
+            } else if (this.context.mode === 2) { // COMMON
+                this.headerSpan.textContent = "Common Activity Items";
             }
-        });
 
-        // Optional: Add close button listener to clear input
-        document.getElementById('btn-close-search')?.addEventListener('click', () => {
-            input.value = '';
-            // You could trigger a view reset here too
-        });
-    }
+            // --- DATA LOADING LOGIC ---
+            // 1. Check if we have a local draft first
+            const cachedData = this._loadFromCache(this.context);
+            let reportList;
 
-    _getSemiMonthlyRangeString(date) {
-        const d = new Date(date);
-        const year = d.getFullYear();
-        const monthIndex = d.getMonth(); // 0-11
-        const month = String(monthIndex + 1).padStart(2, '0');
-        const day = d.getDate();
-
-        // February logic: 1-14 and 15-End
-        if (monthIndex === 1) {
-            if (day <= 14) {
-                return `${year}-${month}-01-14`;
+            if (cachedData) {
+                reportList = cachedData;
+                this.showSnackbar("📂 Loaded unsaved draft from browser.");
+                // Since we loaded a draft, we should mark it as dirty 
+                // so the user knows this still needs to be saved to the server.
+                setTimeout(() => this._setDirty(true), 0);
             } else {
-                const lastDay = new Date(year, monthIndex + 1, 0).getDate();
-                return `${year}-${month}-15-${lastDay}`;
+                // 2. Fallback to server if no local draft exists
+                reportList = await this.handlers.onLoad(this.context);
+            }
+
+            this._renderList(reportList, this.context.mode === 1);
+
+            if (context.mode === 1) {
+                this._updateImportBadge(await this.handlers.onExtract(this.context.arg, this._getPayload()));
             }
         }
 
-        // Standard logic for all other months: 1-15 and 16-End
-        if (day <= 15) {
-            return `${year}-${month}-01-15`;
-        } else {
-            const lastDay = new Date(year, monthIndex + 1, 0).getDate();
-            return `${year}-${month}-16-${lastDay}`;
-        }
+        this.activeLi = null;
     }
 
-    _updateHeader(mode, value) {
-        if (!this.headerSpan) return;
-
-        // Reset buttons
-        Object.values(this.btns).forEach(btn => { if (btn && btn.id !== 'btn-save') btn.style.display = 'none'; });
-
-        if (mode === 0) {
-            this.headerSpan.textContent = `Daily Activities Report - ${value.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' })}`;
-            if (this.btns.attach) this.btns.attach.style.display = 'inline-flex';
-            if (this.btns.send) this.btns.send.style.display = 'inline-flex';
-        } else if (mode === 1) {
-            const range = value;
-            const month = range[0].toLocaleString('default', { month: 'long' });
-            this.headerSpan.textContent = `2-Weekly Report: ${month} ${range[0].getDate()} - ${range[1].getDate()}, ${range[0].getFullYear()}`;
-            if (this.btns.attach) this.btns.attach.style.display = 'inline-flex';
-            if (this.btns.import) this.btns.import.style.display = 'inline-flex';
-            if (this.btns.export) this.btns.export.style.display = 'inline-flex';
-        } else if (mode === 2) {
-            this.headerSpan.textContent = "Common Activity Items";
-        }
-    }
-
-    //========================================================================================================
-    //  SCRAPING & SAVING
-    //========================================================================================================
-
-    async _saveReport() {
-        const { mode, value } = this.selection;
-
-        const items = this._scrapeEditorItems();
-
-        let endpoint = '';
-
-        if (Number(mode) === 0) {
-            const dateStr = value.toISOString().split('T')[0];
-            endpoint = `/save-daily-report/${dateStr}`;
-        }
-        else if (Number(mode) === 1) {
-            const rangeStr = this._getSemiMonthlyRangeString(value[0]);
-            endpoint = `/save-2weekly-report/${encodeURIComponent(rangeStr)}`;
-        }
-        else if (Number(mode) === 2) {
-            endpoint = `/save-common-report`;
-        }
-
-        try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(items),
-                credentials: 'include'
-            });
-
-            if (response.ok) {
-                this.setDirty(false);
-                this.showSnackbar("✅ Saved successfully");
-            } else {
-                this.showSnackbar("❌ Save failed");
-            }
-
-        } catch (err) {
-            this.showSnackbar("⚠️ Network error");
-        }
-    }
-
-
-    //========================================================================================================
-    //  LOADING
-    //========================================================================================================
-
-    async loadDailyReport(dateStr) {
-        const response = await fetch(`/load-daily-report/${dateStr}`);
-        const data = await response.json();
-        console.log(data);
-        this._renderList(data, false);
-        this.setDirty(false);
-    }
-
-    async load2WeeklyReport(rangeStr) {
-        const response = await fetch(`/load-2weekly-report/${rangeStr}`);
-        const items = await response.json(); // it's already an array
-
-        this._renderList(items, false, true);
-        this.setDirty(false);
-
-        const compareRes = await fetch(`/extract-imaged-reports/${rangeStr}`);
-        const compareItems = await compareRes.json();
-
-        const currentUuids = new Set(items.map(i => i.uuid));
-
-        this.pendingItems = compareItems.filter(
-            item => !currentUuids.has(item.uuid)
-        );
-
-        this._updateImportBadge(this.pendingItems.length);
-    }
-
-
-    async loadCommonReport() {
-        const response = await fetch(`/load-common-report`);
-        const data = await response.json();
-        this._renderList(data.items, false);
-        this.setDirty(false);
-    }
-
-    _scrapeEditorItems() {
-        const items = [];
-
-        const list = this.editor.querySelector('ol, ul');
-        if (!list) return items;
-
-        const listItems = list.querySelectorAll('li');
-
-        listItems.forEach(li => {
-
-            let text = '';
-
-            li.childNodes.forEach(node => {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    text += node.textContent;
-                }
-                else if (
-                    node.nodeType === Node.ELEMENT_NODE &&
-                    !node.classList.contains('li-image-scroll')
-                ) {
-                    text += node.innerText;
-                }
-            });
-
-            text = text.trim();
-
-            const image_uuids = [];
-            const imageWrappers = li.querySelectorAll('.li-image-scroll [data-img-uuid]');
-
-            imageWrappers.forEach(wrapper => {
-                const uuid = wrapper.getAttribute('data-img-uuid');
-                if (uuid) image_uuids.push(uuid);
-            });
-
-            if (text !== '' || image_uuids.length > 0) {
-                items.push({
-                    uuid: li.getAttribute('data-uuid'),
-                    text_content: text,
-                    image_uuids: image_uuids
-                });
-            }
-        });
-
-        return items;
-    }
-
-
-    async _renderList(items, ordered, imagesCentered = false) {
-        const { mode } = this.selection;
-
-        const is2Weekly = (Number(mode) === 1);
-
-        const listTag = (ordered || is2Weekly) ? 'ol' : 'ul';
+    /**
+     * DATA RENDERER
+     * Converts a JSON array of items into an HTML list (UL or OL).
+     * 1. Uses OL (Numbered) for 2-Weekly, UL (Bullet) for others.
+     * 2. Automatically pulls "Common Items" if a new daily report is empty.
+     * 3. Attaches click listeners to the list to track the 'active' row.
+     */
+    async _renderList(items = [], is2Weekly) {
+        const listTag = (is2Weekly) ? 'ol' : 'ul';
         const listElement = document.createElement(listTag);
 
         if (listTag === 'ol') {
@@ -579,518 +293,329 @@ export default class WhiteboardManager {
             listElement.style.marginLeft = '1rem';
         }
 
-
-
         if (items && items.length > 0) {
             items.forEach(item => {
-                listElement.appendChild(this._createListItem(item, imagesCentered));
+                listElement.appendChild(this._createListItem(item, is2Weekly));
             });
         }
         else if (is2Weekly) {
-            listElement.appendChild(
-                this._createListItem({ text_content: "" }, imagesCentered)
-            );
+            listElement.appendChild(this._createListItem({ text_content: "" }, is2Weekly));
         }
         else {
+            // Auto-populate with Common items if report is empty
             try {
-                const response = await fetch('/load-common-report', {
-                    credentials: 'include'
-                });
-                const data = await response.json();
-
+                const data = await this.handlers.onLoad({ mode: 2 });
                 if (Array.isArray(data) && data.length > 0) {
                     data.forEach(cItem => {
-                        const li = this._createListItem(cItem, imagesCentered);
-                        listElement.appendChild(li);
+                        // CLONE the item but GIVE IT A NEW UUID
+                        const newItem = {
+                            ...cItem,
+                            uuid: uuidv4() // Generate a fresh ID for this specific day
+                        };
+                        listElement.appendChild(this._createListItem(newItem, is2Weekly));
                     });
                 } else {
-                    listElement.appendChild(
-                        this._createListItem(
-                            { text_content: "Type your job here mano..." },
-                            imagesCentered
-                        )
-                    );
+                    listElement.appendChild(this._createListItem({ uuid: uuidv4(), text_content: "" }, is2Weekly));
                 }
             } catch (e) {
-                listElement.appendChild(
-                    this._createListItem(
-                        { text_content: "Type your job here mano..." },
-                        imagesCentered
-                    )
-                );
+                listElement.appendChild(this._createListItem({ uuid: uuidv4(), text_content: "" }, is2Weekly));
             }
         }
 
         this.editor.innerHTML = '<div id="li-highlighter" class="li-highlighter"></div>';
         this.editor.appendChild(listElement);
         this.highlighter = document.getElementById('li-highlighter');
-        // Inside _renderList, after appending the listElement
+
         listElement.addEventListener('click', (e) => {
             const li = e.target.closest('li');
             if (li) {
                 this.activeLi = li;
-                this.moveHighlighter();
+                this._moveHighlighter();
             }
         });
-        this.setDirty(false);
+        this._setDirty(false);
     }
-
 
     _createListItem(itemData = {}, centered = false) {
         const li = document.createElement('li');
         li.setAttribute('data-uuid', itemData.uuid || uuidv4());
+        li.className = 'report-item-li';
         li.contentEditable = "true";
 
-        const textNode = document.createTextNode(itemData.text_content || "");
-        li.appendChild(textNode);
+        // 1. Text Area (Stays left-aligned by default)
+        const textSpan = document.createElement('span');
+        textSpan.className = 'item-text';
+        textSpan.textContent = itemData.text_content || "";
+        li.appendChild(textSpan);
 
+        // 2. Image Gallery
         if (itemData.image_uuids?.length > 0) {
-            const scrollDiv = document.createElement('div');
-            scrollDiv.className = 'li-image-scroll';
-            scrollDiv.contentEditable = "false"; // This is why the caret jumps!
+            const gallery = document.createElement('div');
+            gallery.className = 'item-gallery';
 
-            // --- ADD THIS SECTION ---
-            scrollDiv.onclick = (e) => {
-                // Prevent the browser from focusing the very start of the LI
-                e.preventDefault();
-
-                // Focus the LI so it's active
-                li.focus();
-
-                // Move caret to the end of the text node
-                const range = document.createRange();
-                const selection = window.getSelection();
-
-                // Target the textNode we created above
-                range.setStartAfter(textNode);
-                range.collapse(true);
-
-                selection.removeAllRanges();
-                selection.addRange(range);
-
-                // Sync your highlighter
-                this.moveHighlighter();
-            };
-            // -------------------------
-
+            // Only the gallery gets the centering class
             if (centered) {
-                scrollDiv.style.display = 'flex';
-                scrollDiv.style.justifyContent = 'center';
-                scrollDiv.style.flexWrap = 'wrap';
-                scrollDiv.style.gap = 'inherit';
+                gallery.classList.add('gallery-centered');
             }
 
-            itemData.image_uuids.forEach(imgUuid => {
-                scrollDiv.appendChild(this._createImageWrapper(imgUuid));
-            });
+            gallery.contentEditable = "false";
 
-            li.appendChild(scrollDiv);
+            itemData.image_uuids.forEach(uuid => {
+                const imgWrapper = this._createImage(uuid);
+                gallery.appendChild(imgWrapper);
+            });
+            li.appendChild(gallery);
         }
 
         return li;
     }
 
-
-    // Helper for the image + delete button structure
-    _createImageWrapper(uuid) {
+    _createImage(uuid) {
         const wrapper = document.createElement('div');
-        wrapper.className = 'li-img-wrapper';
-        wrapper.setAttribute('data-img-uuid', uuid);
+        wrapper.className = 'img-wrapper';
+        wrapper.contentEditable = "false";
 
         const img = document.createElement('img');
         img.src = `/image-bucket/get-image/${uuid}?thumb=true`;
-        img.dataset.uuid = uuid;
         img.className = 'report-img';
-        img.loading = 'lazy';
-        img.alt = 'Report Image';
+        img.setAttribute('data-img-uuid', uuid);
 
-        const overlay = document.createElement('div');
-        overlay.className = 'img-delete-overlay';
-        overlay.textContent = '✕';
-
-        overlay.onclick = (e) => {
+        // DELETE ICON
+        const delBtn = document.createElement('div');
+        delBtn.className = 'img-del-btn';
+        delBtn.innerHTML = '&times;';
+        delBtn.onclick = (e) => {
             e.stopPropagation();
-            this._handleImageRemoval(uuid, wrapper);
+
+            // 1. Reference the gallery before removing the image
+            const gallery = wrapper.closest('.item-gallery');
+
+            // 2. Remove the image wrapper
+            wrapper.remove();
+
+            // 3. Check if the gallery is now empty
+            if (gallery && gallery.querySelectorAll('.img-wrapper').length === 0) {
+                gallery.remove();
+            }
+
+            // 4. Update state and UI
+            this._setDirty(true); // Changed from markAsDirty() to match your class method
+            this._moveHighlighter();
+        };
+
+        // RIGHT CLICK (Context Menu) Logic
+        wrapper.oncontextmenu = (e) => {
+            e.preventDefault(); // Stop the standard browser menu
+            e.stopPropagation();
+
+            const gallery = wrapper.closest('.item-gallery');
+            if (!gallery) return;
+
+            // Find all sibling wrappers in this gallery
+            const allWrappers = Array.from(gallery.querySelectorAll('.img-wrapper'));
+
+            // Find the index of the current wrapper
+            const currentIndex = allWrappers.indexOf(wrapper);
+
+            // Map all wrappers to their image UUIDs
+            const allUuids = allWrappers.map(w =>
+                w.querySelector('img').getAttribute('data-img-uuid')
+            );
+
+            this.handlers.onMagnify(allUuids, currentIndex);
+        };
+
+        // Keep your standard click for simple focus/magnify if needed
+        img.onclick = (e) => {
+            e.preventDefault(); // Stop the standard browser menu
+            e.stopPropagation();
+
+            const gallery = wrapper.closest('.item-gallery');
+            if (!gallery) return;
+
+            // Find all sibling wrappers in this gallery
+            const allWrappers = Array.from(gallery.querySelectorAll('.img-wrapper'));
+
+            // Find the index of the current wrapper
+            const currentIndex = allWrappers.indexOf(wrapper);
+
+            // Map all wrappers to their image UUIDs
+            const allUuids = allWrappers.map(w =>
+                w.querySelector('img').getAttribute('data-img-uuid')
+            );
+
+            this.handlers.onMagnify(allUuids, currentIndex);
         };
 
         wrapper.appendChild(img);
-        wrapper.appendChild(overlay);
-
+        wrapper.appendChild(delBtn);
         return wrapper;
     }
 
-    onSearchMatch(match) {
-        const editor = document.getElementById('editor');
-        if (!editor) return;
+    attachImagesToActiveLi(imageUuids) {
+        if (imageUuids && imageUuids.length > 0) {
+            // 1. Find or Create the gallery container inside this LI
+            let gallery = this.activeLi.querySelector('.item-gallery');
 
-        // 1. Create the item
-        const matchElement = this._createSearchMatchItem(match);
-
-        // 2. Append it to the editor
-        editor.appendChild(matchElement);
-
-        // 3. Optional: Remove the "Waiting..." message if you added one
-        const statusMsg = document.getElementById('search-status-msg');
-        if (statusMsg) statusMsg.remove();
-    }
-
-    _createSearchMatchItem(itemData = {}) {
-        const container = document.createElement('div');
-        container.className = 'search-match-card';
-
-        // Professional Card Styling
-        container.style.cssText = `
-        margin: 8px 16px;
-        padding: 20px;
-        background: #ffffff;
-        border: 1px solid #eef2f6;
-        border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        cursor: pointer;
-        transition: all 0.2s ease-in-out;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    `;
-
-        // 2. Date Header with Badge Style
-        const dateHeader = document.createElement('div');
-        dateHeader.style.cssText = `
-        font-size: 0.75rem;
-        font-weight: 700;
-        color: #3b82f6;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        background: #eff6ff;
-        align-self: flex-start;
-        padding: 4px 10px;
-        border-radius: 20px;
-        margin-bottom: 4px;
-    `;
-        dateHeader.textContent = itemData.date || "Unknown Date";
-        container.appendChild(dateHeader);
-
-        // 3. Text Content
-        const content = document.createElement('div');
-        content.className = 'match-text';
-        content.style.cssText = `
-        color: #334155;
-        font-size: 0.95rem;
-        line-height: 1.6;
-        white-space: pre-wrap;
-        margin-bottom: 8px;
-    `;
-        content.textContent = itemData.text_content || "";
-        container.appendChild(content);
-
-        // 4. Images Section (Visual Strip)
-        if (itemData.image_uuids?.length > 0) {
-            const scrollDiv = document.createElement('div');
-            scrollDiv.className = 'li-image-scroll';
-
-            // Refined image strip container
-            scrollDiv.style.cssText = `
-            display: flex;
-            gap: 10px;
-            overflow-x: auto;
-            padding-bottom: 8px;
-            scrollbar-width: thin;
-        `;
-
-            itemData.image_uuids.forEach(imgUuid => {
-                const imgWrapper = this._createImageWrapper(imgUuid);
-
-                // Cleanup the wrapper for read-only view
-                const overlay = imgWrapper.querySelector('.img-delete-overlay');
-                if (overlay) overlay.remove();
-
-                // Add a subtle border to thumbnails
-                const img = imgWrapper.querySelector('img');
-                if (img) img.style.borderRadius = '6px';
-
-                scrollDiv.appendChild(imgWrapper);
-            });
-            container.appendChild(scrollDiv);
-        }
-
-        // 5. Click Action
-        //container.onclick = () => {
-        //    this.updateView({ mode: 0, value: new Date(itemData.date) });
-        //};
-
-        return container;
-    }
-
-    async _handleImageRemoval(uuid, element) {
-        this.decisionModal.style.display = 'flex';
-
-        const action = await new Promise((resolve) => {
-
-            const cleanup = () => {
-                this.btnDetach.onclick = null;
-                this.btnDelete.onclick = null;
-                this.btnCancel.onclick = null;
-                this.decisionModal.onclick = null;
-            };
-
-            this.btnDetach.onclick = () => {
-                cleanup();
-                resolve('detach');
-            };
-
-            this.btnDelete.onclick = () => {
-                cleanup();
-                resolve('delete');
-            };
-
-            this.btnCancel.onclick = () => {
-                cleanup();
-                resolve('cancel');
-            };
-
-            this.decisionModal.onclick = (e) => {
-                if (e.target === this.decisionModal) {
-                    cleanup();
-                    resolve('cancel');
-                }
-            };
-        });
-
-        this.decisionModal.style.display = 'none';
-
-        if (action === 'detach') {
-            element.remove();
-            this._cleanupEmptyImageContainer(element);
-            this.setDirty(true);
-            this.showSnackbar("Image removed from report");
-        }
-        else if (action === 'delete') {
-            try {
-                const res = await fetch(`/image-bucket/delete/${uuid}`, { method: 'DELETE' });
-                if (res.ok) {
-                    element.remove();
-                    this._cleanupEmptyImageContainer(element);
-                    this.setDirty(true);
-                    this.showSnackbar("Deleted from server forever");
-                }
-            } catch (err) {
-                this.showSnackbar("Server error");
-            }
-        }
-
-        this.moveHighlighter();
-    }
-
-    _cleanupEmptyImageContainer(imageWrapper) {
-        const container = imageWrapper.closest('.li-image-scroll');
-        if (!container) return;
-
-        if (container.children.length === 0) {
-            container.remove();
-        }
-    }
-
-
-
-    async attachImagesToActiveLi(uuids) {
-        if (!uuids || uuids.length === 0) return;
-
-        const targetLi = this.activeLi;
-        if (!targetLi) return;
-
-        let scrollContainer = targetLi.querySelector('.li-image-scroll');
-
-        if (!scrollContainer) {
-            scrollContainer = this._createImageContainer();
-            targetLi.appendChild(scrollContainer);
-        }
-
-        uuids.forEach(uuid => {
-            scrollContainer.appendChild(this._createImageWrapper(uuid));
-            this.setDirty(true);
-        });
-
-        this.moveHighlighter();
-
-        if (typeof this.showSnackbar === "function") {
-            this.showSnackbar(`${uuids.length} images attached.`);
-        }
-    }
-
-    _createImageContainer() {
-        const container = document.createElement('div');
-        container.className = 'li-image-scroll';
-        container.contentEditable = "false";
-
-        if (this.selection?.imagesCentered) {
-            container.style.display = 'flex';
-            container.style.justifyContent = 'center';
-            container.style.flexWrap = 'wrap';
-            container.style.gap = 'inherit';
-        }
-
-        return container;
-    }
-
-
-
-    async attachImageToActiveLi(uuid) {
-        if (!uuid) return;
-
-        this._attachmentQueue.push(uuid);
-
-        if (!this._isProcessingQueue) {
-            await this._processAttachmentQueue();
-        }
-    }
-
-    async _processAttachmentQueue() {
-        this._isProcessingQueue = true;
-
-        while (this._attachmentQueue.length > 0) {
-            const uuid = this._attachmentQueue.shift();
-            await this._executeSingleAttachment(uuid);
-            await new Promise(r => setTimeout(r, 40));
-        }
-
-        this._isProcessingQueue = false;
-    }
-
-    async _executeSingleAttachment(uuid) {
-        const targetLi = this.activeLi;
-        if (!targetLi) return;
-
-        let container = targetLi.querySelector('.li-image-scroll');
-        if (!container) {
-            container = this._createImageContainer();
-            targetLi.appendChild(container);
-        }
-
-        container.appendChild(this._createImageWrapper(uuid));
-        this.setDirty(true);
-
-        this.moveHighlighter();
-    }
-
-
-    async _executeSearch(query) {
-        if (!query.trim()) return;
-
-        const resultsArea = document.getElementById('search-results-area');
-        resultsArea.innerHTML = '<div class="search-loading">Searching history...</div>';
-
-        try {
-            const response = await fetch(`/search-reports?q=${encodeURIComponent(query)}`);
-            const data = await response.json();
-
-            if (!data.items || data.items.length === 0) {
-                resultsArea.innerHTML = `
-                    <div class="search-placeholder">
-                        <p>No results found for "${query}"</p>
-                    </div>`;
-                return;
+            if (!gallery) {
+                gallery = document.createElement('div');
+                gallery.className = 'item-gallery';
+                gallery.contentEditable = "false";
+                this.activeLi.appendChild(gallery);
             }
 
-            // Render the results
-            resultsArea.innerHTML = data.items.map(item => `
-                <div class="search-result-item" data-uuid="${item.uuid}" style="
-                    padding: 15px;
-                    border-bottom: 1px solid #eee;
-                    cursor: pointer;
-                    transition: background 0.2s;
-                ">
-                    <div style="font-weight: bold; color: #36618e; margin-bottom: 5px;">
-                        ${item.report_dateStr}
-                    </div>
-                    <div style="font-size: 14px; color: #444; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                        ${item.text}
-                    </div>
-                </div>
-            `).join('');
-
-            // Add click listeners to results to "jump" to that report
-            resultsArea.querySelectorAll('.search-result-item').forEach(el => {
-                el.onclick = () => {
-                    const uuid = el.getAttribute('data-uuid');
-                    this._loadHistoricalReport(uuid);
-                };
+            // 2. Append wrappers to the GALLERY, not the LI
+            imageUuids.forEach(uuid => {
+                const wrapper = this._createImage(uuid);
+                gallery.appendChild(wrapper);
             });
 
-        } catch (err) {
-            resultsArea.innerHTML = '<div class="search-error">Search failed. Check connection.</div>';
-            console.error("Search Error:", err);
+            this._setDirty(true);
+            this._moveHighlighter();
         }
     }
 
-    //========================================================================================================
-    //  UI HELPERS
-    //========================================================================================================
+    //=====================================================================================================================
+    //  SAVING SAVING SAVING
+    //=====================================================================================================================
 
-    _renderSearchUI() {
-        // 1. Clear the whiteboard
-        this.whiteboard.innerHTML = `
-            <div class="search-view-container" style="display: flex; flex-direction: column; height: 100%;">
-                <div class="whiteboard-header">
-                    <div class="header-left">
-                        <div class="search-input-wrapper">
-                            <span class="material-symbols-rounded">search</span>
-                            <input type="text" id="global-search-input" placeholder="Search across all history...">
-                            <button id="btn-exit-search" title="Close Search">✕</button>
-                        </div>
-                    </div>
-                    <div class="header-buttons">
-                        </div>
-                </div>
-                <div id="search-results-area" class="whiteboard-content">
-                    <div class="search-placeholder">
-                        <span class="material-symbols-rounded" style="font-size: 48px; opacity: 0.2;">history_edu</span>
-                        <p>Enter keywords to search past reports</p>
-                    </div>
-                </div>
-            </div>
-        `;
+    _getPayload() {
+        // Find all list items in the editor
+        const items = this.editor.querySelectorAll('.report-item-li');
 
-        const input = document.getElementById('global-search-input');
-        input.focus();
+        return Array.from(items).map(li => {
+            // 1. Get the UUID of the row
+            const rowUuid = li.getAttribute('data-uuid');
 
-        // Event Listeners
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') this._executeSearch(input.value);
+            // 2. Get the text content from our specific text span
+            const textContent = li.querySelector('.item-text')?.textContent || "";
+
+            // 3. Get all image UUIDs from the gallery
+            const imgElements = li.querySelectorAll('.report-img');
+            const imageUuids = Array.from(imgElements).map(img =>
+                img.getAttribute('data-img-uuid')
+            );
+
+            return {
+                uuid: rowUuid,
+                text_content: textContent,
+                image_uuids: imageUuids
+            };
         });
-
-        document.getElementById('btn-exit-search').onclick = () => {
-            // Switch back to Daily Mode (Mode 0) or whatever was previous
-            this.updateView({ mode: 0, value: "Daily Activities" });
-        };
     }
 
-    _restoreEditorUI() {
-        // Re-inject the original HTML structure for the editor
-        this.whiteboard.innerHTML = `
-            <h3 class="whiteboard-header">
-                <div class="header-left">
-                    <span class="icon">📝</span>
-                    <span id="header-text"></span>
-                </div>
-                <div class="header-buttons">
-                    <button id="btn-import">Import</button>
-                    <button id="btn-export">Export</button>
-                    <button id="btn-send">Send to Real Report</button>
-                    <button id="btn-attach">Attach Image</button>
-                    <button id="btn-save">Save</button>
-                </div>
-            </h3>
-            <div class="whiteboard-content" contenteditable="true" id="editor">
-                <div id="li-highlighter" class="li-highlighter"></div>
-            </div>
-        `;
-        // Re-cache elements because the old references are now dead
-        this.editor = document.getElementById('editor');
-        this.headerSpan = document.getElementById('header-text');
-        // ... re-bind buttons if necessary
+    /**
+     * KEYBOARD HANDLER
+     * 1. ENTER: Prevents default browser behavior to insert a custom <li> via _createListItem.
+     * 2. SHIFT + ENTER: Inserts a line break (<br>) within the same <li>.
+     * 3. ALL OTHER KEYS: Updates the highlighter position as you type.
+     */
+    _handleKeyDown(e) {
+        if (e.key === 'Enter') {
+            this._setDirty(true);
+            e.preventDefault();
+
+            if (e.shiftKey) {
+                this._insertNewLine();
+                // Immediate sync for line breaks
+                this._moveHighlighter();
+            } else {
+                const selection = window.getSelection();
+                const newLi = this._createListItem();
+
+                if (this.activeLi) {
+                    this.activeLi.after(newLi);
+
+                    // TARGET THE SPAN: Specifically target the .item-text span 
+                    // so the cursor is inside the element that defines the height.
+                    const targetNode = newLi.querySelector('.item-text') || newLi;
+
+                    const newRange = document.createRange();
+                    newRange.setStart(targetNode, 0);
+                    newRange.collapse(true);
+
+                    selection.removeAllRanges();
+                    selection.addRange(newRange);
+
+                    // Update the class reference immediately
+                    this.activeLi = newLi;
+                }
+            }
+
+            // Use requestAnimationFrame to wait for the browser to paint the new LI
+            requestAnimationFrame(() => {
+                this._moveHighlighter();
+                if (!e.shiftKey) {
+                    // Scroll to the activeLi (the new one) instead of trying to find the sibling
+                    this.activeLi?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            });
+
+        } else if (e.ctrlKey && e.key === 'z') {
+            if (this._lastSnapshot) {
+                this.editor.innerHTML = this._lastSnapshot;
+                this._lastSnapshot = null;
+                this._moveHighlighter();
+            }
+        } else if (e.key === 'Backspace' || e.key === 'Delete') {
+            setTimeout(() => {
+                this._setDirty(true);
+                this._moveHighlighter();
+            }, 0);
+        } else {
+            // Debounce or delay slightly for standard typing
+            setTimeout(() => this._moveHighlighter(), 0);
+        }
     }
 
-    moveHighlighter() {
+    /**
+     * UTILITY: LINE BREAK
+     * Uses execCommand for cross-browser stability to insert a <br>.
+     * Includes a fallback to scroll to the cursor to ensure it doesn't disappear.
+     */
+    _insertNewLine() {
+        document.execCommand('insertLineBreak');
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.collapse(true);
+            const tempSpan = document.createElement('span');
+            range.insertNode(tempSpan);
+            tempSpan.scrollIntoView({ block: 'nearest' });
+            tempSpan.remove();
+        }
+    }
+
+    _getCacheKey(context) {
+        // Generates a unique key like: "draft_0_2026-02-01"
+        return `draft_${context.mode}_${context.arg || 'default'}`;
+    }
+
+    _saveToCache(context, data) {
+        const key = this._getCacheKey(context);
+        // Changed to sessionStorage
+        sessionStorage.setItem(key, JSON.stringify(data));
+    }
+
+    _loadFromCache(context) {
+        const key = this._getCacheKey(context);
+        // Changed to sessionStorage
+        const saved = sessionStorage.getItem(key);
+        return saved ? JSON.parse(saved) : null;
+    }
+
+    _clearCache(context) {
+        const key = this._getCacheKey(context);
+        // Changed to sessionStorage
+        sessionStorage.removeItem(key);
+    }
+
+    /**
+     * VISUAL SYNC: HIGHLIGHTER
+     * Calculates the exact pixel position and height of the current <li>.
+     * Moves the 'li-highlighter' div to "follow" the user as they type or click.
+     */
+    _moveHighlighter() {
         const selection = window.getSelection();
         if (selection.rangeCount > 0 && this.highlighter) {
             const node = selection.anchorNode;
@@ -1108,87 +633,10 @@ export default class WhiteboardManager {
         }
     }
 
-    _handleKeyDown(e) {
-        if (e.key === 'Enter') {
-            this.setDirty(true);
-            e.preventDefault();
-
-            const selection = window.getSelection();
-            const newLi = this._createListItem();
-
-            if (this.activeLi) {
-                this.activeLi.after(newLi);
-
-                const newRange = document.createRange();
-                newRange.setStart(newLi, 0);
-                newRange.collapse(true);
-
-                selection.removeAllRanges();
-                selection.addRange(newRange);
-
-                // Use setTimeout to ensure the DOM has updated before calculating positions
-                setTimeout(() => {
-                    this.moveHighlighter();
-
-                    // --- AUTO SCROLL LOGIC ---
-                    newLi.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'nearest'
-                    });
-                }, 0);
-            }
-        } else {
-            setTimeout(() => this.moveHighlighter(), 0);
-        }
-    }
-
-    stashCurrentProgress() {
-        const key = this._getCacheKey();
-        const html = document.getElementById('editor').innerHTML;
-        localStorage.setItem(key, html);
-        this.setDirty(false);
-        this.showSnackbar("Temporary store unsaved changes to cache.");
-    }
-
-    _getCacheKey() {
-        const { mode, value } = this.selection;
-        let id = "";
-        if (mode === 0) id = value.toISOString().split('T')[0];
-        else if (mode === 1) id = this._getSemiMonthlyRangeString(value[0]);
-        else id = "common";
-
-        return `editor_stash_${mode}_${id}`;
-    }
-
-    async loadReport(type, identifier) {
-        const cacheKey = `editor_stash_${this.selection.mode}_${identifier}`;
-        const stashedHTML = localStorage.getItem(cacheKey);
-
-        if (stashedHTML) {
-            // RESTORE FROM CACHE
-            this.editor.innerHTML = stashedHTML;
-            localStorage.removeItem(cacheKey);
-            this.setDirty(true);
-            this.highlighter = document.getElementById('li-highlighter');
-        } else {
-            // FETCH FROM SERVER
-            // We reuse your existing specific load functions here
-            if (type === 'daily') {
-                await this.loadDailyReport(identifier);
-            } else if (type === 'weekly') {
-                await this.load2WeeklyReport(identifier);
-            } else if (type === 'common') {
-                await this.loadCommonReport();
-            }
-
-            this.setDirty(false);
-        }
-    }
-
     _updateImportBadge(count) {
         const btn = this.btns.import;
         let badge = btn.querySelector('.btn-badge');
-
+        console.log("count", count);
         if (count > 0) {
             if (!badge) {
                 badge = document.createElement('span');
@@ -1229,17 +677,93 @@ export default class WhiteboardManager {
         }
     }
 
-    setDirty(bol) {
+    /**
+     * STATE MANAGER: IS DIRTY
+     * Updates the 'Save' button styling to indicate if there are unsaved changes.
+     */
+    _setDirty(bol) {
         const saveBtn = this.btns.save;
         if (!saveBtn) return;
 
         if (bol) {
             saveBtn.classList.add('is-dirty');
-            console.log("dirt");
+
+            // ADD THIS: Silent backup to localStorage
+            if (this.context && this.context.mode !== 3) {
+                this._saveToCache(this.context, this._getPayload());
+            }
         } else {
             saveBtn.classList.remove('is-dirty');
         }
         this.isDirty = bol;
+    }
+
+    onSearchMatch(match) {
+        let resultsList = this.editor.querySelector('.search-results-list');
+
+        // 1. Initial Setup: If this is the first match, clear "Searching..." text and create the UL
+        if (!resultsList) {
+            // Clear everything except the highlighter
+            this.editor.innerHTML = '<div id="li-highlighter" class="li-highlighter"></div>';
+            resultsList = document.createElement('ul');
+            resultsList.className = 'search-results-list';
+            this.editor.appendChild(resultsList);
+        }
+
+        // 2. Create the Card
+        const card = document.createElement('li');
+        card.className = 'search-result-card';
+        card.contentEditable = "false"; // History is read-only
+
+        // 3. Build Header (Date + UUID/Ref) - WITH INLINE STYLING
+        const header = document.createElement('div');
+        header.className = 'card-header';
+
+        const dateSpan = document.createElement('span');
+        dateSpan.className = 'card-date';
+
+        // --- Inline Styles ---
+        dateSpan.style.fontSize = '0.85em';     // Slightly smaller
+        dateSpan.style.color = '#757575';       // Muted grey
+        dateSpan.style.fontStyle = 'italic';    // Italicized
+        dateSpan.style.display = 'block';       // Ensures it doesn't fight for space
+        dateSpan.style.marginBottom = '4px';    // Spacing from the body text
+
+        dateSpan.textContent = this._formatDate(match.date);
+        header.appendChild(dateSpan);
+        card.appendChild(header);
+
+        // 4. Build Body (Text Content)
+        const body = document.createElement('div');
+        body.className = 'card-text';
+        body.textContent = match.text_content;
+        card.appendChild(body);
+
+        // 5. Build Gallery (if images exist)
+        if (match.image_uuids && match.image_uuids.length > 0) {
+            const gallery = document.createElement('div');
+            gallery.className = 'item-gallery gallery-compact';
+
+            match.image_uuids.forEach(uuid => {
+                // Re-using your existing _createImage method!
+                const imgWrapper = this._createImage(uuid);
+                // Optional: Remove delete button for search results
+                imgWrapper.querySelector('.img-del-btn')?.remove();
+                gallery.appendChild(imgWrapper);
+            });
+
+            card.appendChild(gallery);
+        }
+
+        // 6. Append to list
+        resultsList.appendChild(card);
+    }
+
+    /** * Simple Helper for Search Dates 
+     */
+    _formatDate(dateStr) {
+        const options = { year: 'numeric', month: 'short', day: 'numeric' };
+        return new Date(dateStr).toLocaleDateString(undefined, options);
     }
 
     showSnackbar(message) {

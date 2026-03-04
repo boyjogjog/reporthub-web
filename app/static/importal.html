@@ -257,7 +257,15 @@
 
         } catch (err) {
             console.error(err);
-            showError("Transfer Failed: " + err.message);
+            // HIDE the progress UI and SHOW the error view
+            document.getElementById('portalView').style.display = 'none';
+            const errorView = document.getElementById('errorView');
+            const errorMsg = document.getElementById('errorMsg');
+            
+            errorView.style.display = 'block';
+            errorMsg.textContent = "Upload Error";
+            // Update the description text to be relevant
+            errorMsg.nextElementSibling.textContent = err.message + " Please rescan the QR code to try again.";
         }
     };
 

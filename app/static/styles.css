@@ -78,9 +78,61 @@ body {
     background: #36618e;
     color: white;
     border: none;
-    padding: 10px 24px;
+    font-weight: 600;
+    padding: 10px 24px; /* Adjusted horizontal padding */
     border-radius: 6px;
     cursor: pointer;
+    
+    /* 🔹 Alignment Magic */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px; /* 🔹 Proper spacing between icon and text */
+    
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.search-btn:hover {
+    background: #2a4d70;
+}
+
+.search-icon { 
+    /* 1. Define the shape */
+    -webkit-mask: url('icons/search.svg') no-repeat center;
+    mask: url('icons/search.svg') no-repeat center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+
+    /* 2. Define the COLOR that shows through the mask */
+    background-color: #ffffff !important; 
+    
+    /* 3. Layout */
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    /* 4. Prevent inheritance issues */
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+}
+
+.search2-icon { 
+    /* 1. Define the shape */
+    -webkit-mask: url('icons/search.svg') no-repeat center;
+    mask: url('icons/search.svg') no-repeat center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+
+    /* 2. Define the COLOR that shows through the mask */
+    background-color: #444444 !important; 
+    
+    /* 3. Layout */
+    display: inline-block;
+    width: 30px;
+    height: 30px;
+    /* 4. Prevent inheritance issues */
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
 }
 
 /* =========================================
@@ -137,6 +189,7 @@ body {
     background-color: #ffffff;
     height: calc(100vh - 120px);
     padding-bottom: 16px;
+    backdrop-filter: blur(2px);
 }
 
 .whiteboard-header {
@@ -163,11 +216,11 @@ body {
 }
 
 .header-buttons button {
-    padding: 10px 24px;
+    padding: 8px 24px;
     border-radius: 999px;
     background-color: #f2f3fa;
     border: none;
-    color: #1f759c;
+    color: #36618e;
     box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
     font-size: 14px;
     font-weight: 600;
@@ -250,141 +303,253 @@ body {
     outline: none;
     padding: 15px;
     min-height: 200px;
-    /* Hide scrollbar for Firefox */
     scrollbar-width: none; 
-    
-    /* Hide scrollbar for IE/Edge */
     -ms-overflow-style: none;
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
 .whiteboard-content::-webkit-scrollbar {
     display: none;
 }
 
-/* Parent container rules */
 .whiteboard-content ol,
 .whiteboard-content ul {
     position: relative;
     z-index: 2;
     margin: 0;
     padding: 24px 60px;
-    list-style-position: outside;
 }
 
-/* Ensure Ordered Lists actually show numbers */
-.whiteboard-content ol {
-    list-style-type: decimal !important;
-}
+.whiteboard-content ol { list-style-type: decimal !important; }
+.whiteboard-content ul { list-style-type: disc !important; }
 
-/* Ensure Unordered Lists show dots */
-.whiteboard-content ul {
-    list-style-type: disc !important;
-}
-
-/* Common List Item Styles */
-.whiteboard-content ol li,
-.whiteboard-content ul li,
-#editor li {
-    display: list-item !important; /* Required for the number/dot to exist */
+/* The List Item: 
+   We remove 'display: list-item !important' from here because 
+   it overrides the Flexbox layout needed for images.
+*/
+.whiteboard-content li {
     padding: 4px 12px;
     margin: 1px 0;
     border-radius: 6px;
     cursor: text;
     line-height: 1.4;
     min-height: 1.4em;
-    /* Removed list-style-type: disc from here so it doesn't override the parent */
+    position: relative;
+    /* Use 'display: list-item' only if it's NOT a report-item with images */
 }
 
-/* Specific gap for internal content (like images) */
-.whiteboard-content li {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    display: list-item !important; 
+/* Base style for the icon container */
+.icon {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  background-color: #444; /* This defines the icon COLOR */
+  
+  /* The "Mask" logic */
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+
+
+/* Assigning the specific SVG paths from your folder */
+.image-bucket-icon {
+    display: inline-block;
+    width: 26px;
+    height: 26px;
+    background: url('icons/image-bucket.png') no-repeat center / contain;
+    
+    /* 🔹 Add this for a subtle, natural shadow */
+    filter: drop-shadow(0px 4px 4px rgba(0, 0, 0, 0.2));
+    
+    /* Optional: Makes the icon "pop" more against the light blue header */
+    transition: filter 0.2s ease;
+}
+
+/* Hover effect for a little extra polish */
+.image-bucket-icon:hover {
+    filter: drop-shadow(0px 4px 4px rgba(0, 0, 0, 0.3));
+}
+
+.report-icon { 
+  -webkit-mask-image: url('icons/report.svg'); 
+  mask-image: url('icons/report.svg');
+  background-color: #36618e;
+  width: 26px;
+  height: 26px;
+}
+
+.import-icon { 
+  -webkit-mask-image: url('icons/import.svg'); 
+  mask-image: url('icons/import.svg');
+  background-color: #ff791f;
+}
+.export-icon { 
+  -webkit-mask-image: url('icons/export.svg'); 
+  mask-image: url('icons/export.svg');
+  background-color: #9d3cd6;
+}
+.send-icon   { 
+  -webkit-mask-image: url('icons/copy-paste.svg'); 
+  mask-image: url('icons/copy-paste.svg');
+  background-color: #9d3cd6;
+}
+.attach-icon { 
+  -webkit-mask-image: url('icons/image.svg'); 
+  mask-image: url('icons/image.svg');
+  background-color: #32a1fc;
+}
+.logout-icon { 
+  -webkit-mask-image: url('icons/logout.svg'); 
+  mask-image: url('icons/logout.svg');
+  background-color: #ff5757;
+}
+.settings-icon { 
+  -webkit-mask-image: url('icons/settings.svg'); 
+  mask-image: url('icons/settings.svg');
+  background-color: #ffffff;
+  width: 24px;
+  height: 24px;
+}
+/* Default state (Not Dirty / Saved) */
+.save-icon { 
+  -webkit-mask-image: url('icons/check.svg'); 
+  mask-image: url('icons/check.svg'); 
+  background-color: #28a745; /* Green for "Saved" */
+}
+
+/* Dirty state (Unsaved changes) */
+.is-dirty .save-icon { 
+  -webkit-mask-image: url('icons/save.svg'); 
+  mask-image: url('icons/save.svg'); 
+  background-color: #dc3545; /* Red or Blue for "Needs Saving" */
+}
+
+
+/* =========================================
+   6. ATTACHED IMAGES - WRAPPED GALLERY
+   ========================================= */
+
+/* The List Item: Keeps the bullet working perfectly */
+.report-item-li {
+    display: list-item !important;
     list-style-position: outside;
+    padding: 6px 0 6px 12px;
+    position: relative;
 }
 
-/* Animated Highlighter */
+/* The Text Area */
+.item-text {
+    color: rgb(36, 36, 36);
+    display: inline-block;
+    width: 100%;
+    outline: none;
+    min-height: 1.4em;
+    min-width: 1px;    /* Prevents horizontal collapse */
+    vertical-align: middle;
+}
+
+/* Optional: Ensure the LI itself has a baseline */
+.report-item-li {
+    line-height: 1.5;
+}
+/* The Gallery Container (Flex row) */
+.item-gallery {
+    display: flex;
+    flex-flow: row wrap; /* Horizontal flow with wrapping */
+    gap: 8px;           /* Spacing between image units */
+    margin-top: 4px;
+    padding-bottom: 4px;
+}
+
+/* Individual Wrapper for Image + Icon */
+.img-wrapper {
+    position: relative;  /* Anchor for the absolute delete icon */
+    display: inline-block;
+}
+
+/* The Image styling */
+.report-img {
+    height: 150px;
+    width: auto;
+    max-width: 240px;
+    object-fit: cover;
+    border-radius: 6px;
+    cursor: zoom-in;
+    transition: filter 0.2s, transform 0.2s;
+    display: block;
+}
+
+/* The Delete Button (Overlay) */
+.img-del-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    background: #ef4444; /* Red icon */
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 10;
+    
+    /* Hover logic: Hidden by default */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* HOVER FEEDBACK: Show icon and dim image */
+.img-wrapper:hover .img-del-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.img-wrapper:hover .report-img {
+    filter: brightness(0.8);
+    transform: scale(1.02);
+}
+
+.img-del-btn:hover {
+    background: #dc2626;
+    transform: scale(1.2);
+}
+
+/* UI Feedback for the whole list item */
+.report-item-li:focus-within {
+    background-color: rgba(0, 0, 0, 0.02);
+    border-radius: 4px;
+}
+
+.item-text:focus {
+    border-bottom: 1px dashed #ccc;
+}
+
+/* Animated Highlighter Fix */
 .li-highlighter {
     position: absolute;
-    left: 16px;
-    right: 16px;
-    margin-left: 24px;
-    margin-right: 24px;
+    left: 16px; right: 16px;
+    margin: 0 24px;
     background-color: #bbdefb;
     border-radius: 6px;
-    transition: top 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-                height 0.2s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.1s;
+    transition: top 0.2s ease, height 0.2s ease, opacity 0.1s;
     z-index: 1;
     pointer-events: none;
     opacity: 0;
 }
 
-/* =========================================
-   6. ATTACHED IMAGES (In-Editor)
-   ========================================= */
-.li-image-scroll {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    padding: 6px 4px;
-    caret-color: transparent;
-    user-select: none;
-}
-
-.li-img-wrapper {
-    height: 150px;
-    display: inline-block;
-    flex-shrink: 0;
-    unicode-bidi: isolate;
-    position: relative; /* Fix: Ensures delete icon is relative to this wrapper */
-}
-
-.li-img-wrapper img {
-    height: 100%;
-    width: auto;
-    max-width: 240px;
-    object-fit: cover;
-    border-radius: 6px;
-}
-
-.report-img {
-    pointer-events: auto;
-    display: block;
-    border-radius: 4px;
-}
-
-/* Delete Button Overlay */
-.img-delete-overlay {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 24px;
-    height: 24px;
-    background: rgba(220, 38, 38, 0.9);
-    color: white;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    opacity: 0;
-    transform: translateY(-5px);
-    transition: all 0.2s ease;
-    cursor: pointer;
-    z-index: 10;
-}
-
-.li-img-wrapper:hover .img-delete-overlay {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.img-delete-overlay:hover {
-    background: #b91c1c;
-    transform: scale(1.1) !important;
+/* Centered Gallery */
+.item-gallery.gallery-centered {
+    justify-content: center; /* Centers the images horizontally */
 }
 
 /* =========================================
@@ -594,7 +759,7 @@ body {
     border: 2px solid #90caf9;
 }
 
-.image-bucket-header {
+.image-bucket-headerr {
     width: 100%;
     background-color: #90caf9;
     color: rgb(0, 0, 0);
@@ -602,6 +767,19 @@ body {
     font-weight: bold;
     font-size: 15px;
     box-sizing: border-box;
+}
+
+.image-bucket-header {
+    width: 100%;
+    display: flex;
+    align-items: center;     /* Vertically centers icon and text */
+    justify-content: center; /* 🔹 Centered horizontally */
+    gap: 12px;               /* Slightly wider gap usually looks better when centered */
+    font-size: 15px;
+    font-weight: 700;
+    padding: 14px;
+    background-color: #90caf9;
+    box-sizing: border-box;  /* Ensures padding doesn't break the 100% width */
 }
 
 .image-bucket-content {
@@ -653,21 +831,41 @@ body {
    9. IMAGE STREAM WIDGET
    ========================================= */
 .image-stream {
-    padding: 0;
+    position: relative;
+    width: 254px; 
+    height: 180px;
     overflow: hidden;
-    width: min-content;
     border: 2px solid #bbdefb;
-    background: #000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    background: #000; /* Black background if image fails */
 }
 
-#streamImage {
-    width: 250px;
-    height: 188px;
-    object-fit: cover;
-    transition: opacity 0.5s ease-in-out;
+.stream-img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    opacity: 0;
+    transition: opacity 1.5s ease-in-out;
+    min-width: 100%;
+    min-height: 100%;
+    display: block;
+    will-change: transform; /* Optimization for smoother movement */
+}
+
+.stream-img.active {
+    opacity: 1;
+    z-index: 2;
+}
+
+.animating {
+    /* Duration is slightly longer than refresh interval (20s) to ensure movement never stops */
+    animation: dynamicSlide 21s linear forwards;
+}
+
+@keyframes dynamicSlide {
+    /* 'from' is omitted because it is set by JS inline styles */
+    to { 
+        transform: translate(var(--shift-x, 0), var(--shift-y, 0)); 
+    }
 }
 
 /* =========================================
@@ -691,7 +889,7 @@ body {
     max-width: 1100px;
     height: 85vh;
     background: #ffffff;
-    border-radius: 24px;
+    border-radius: 12px;
     display: flex;
     flex-direction: column;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
@@ -699,7 +897,7 @@ body {
 }
 
 .gallery-header {
-    padding: 20px 32px;
+    padding: 8px 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -708,9 +906,10 @@ body {
     
 }
 
-.gallery-header h3 { margin: 0; font-size: 1.25rem; font-weight: 700; color: #0f172a; }
+.gallery-header h3 { margin-left: 16px; font-size: 1.10rem; font-weight: 700; color: #0f172a; }
 
 .close-btn {
+    font-size: 20px; margin-right: 16px;
     background: #f1f5f9; border: none; width: 32px; height: 32px;
     border-radius: 50%; cursor: pointer; transition: 0.2s;
 }
@@ -785,7 +984,7 @@ body {
 .gallery-footer {
     padding: 20px 32px; border-top: 1px solid #f1f5f9;
     display: flex; justify-content: space-between; align-items: center;
-    background: #fff;
+    background: #f8f8f8;
 }
 
 .footer-actions { display: flex; gap: 12px; }
@@ -795,10 +994,75 @@ body {
     font-size: 0.9rem; border: none; cursor: pointer; transition: 0.2s;
 }
 
-.btn-copy { background: #f1f5f9; color: #475569; }
-.btn-delete { background: #fee2e2; color: #ef4444; }
-.btn-attach { background: #3b82f6; color: white; }
-.btn-base:hover { transform: translateY(-2px); filter: brightness(0.95); }
+/* =========================================
+   BASE BUTTON (Shared DNA)
+   ========================================= */
+.btn-base,
+.btn-copy,
+.btn-delete,
+.btn-attach {
+    padding: 10px 24px;
+    border-radius: 999px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12),
+                0 1px 2px rgba(0,0,0,0.24);
+}
+
+.btn-copy {
+    background-color: #f2f3fa;
+    color: #1f759c;
+}
+
+.btn-copy:hover {
+    background-color: #ebedf5;
+    box-shadow: 0 6px 10px rgba(0,0,0,0.15),
+                0 3px 5px rgba(0,0,0,0.1);
+}
+
+.btn-copy:active {
+    background-color: #dce0e9;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.btn-delete {
+    background-color: #fff1f0;
+    color: #d93025;
+}
+
+.btn-delete:hover {
+    background-color: #ffccc7;
+    box-shadow: 0 6px 10px rgba(0,0,0,0.15),
+                0 3px 5px rgba(0,0,0,0.1);
+}
+
+.btn-delete:active {
+    background-color: #fca5a5;
+}
+
+.btn-attach {
+    background-color: #1f759c;
+    color: white;
+}
+
+.btn-attach:hover {
+    background-color: #166182;
+    box-shadow: 0 6px 10px rgba(0,0,0,0.18),
+                0 3px 5px rgba(0,0,0,0.12);
+}
+
+.btn-attach:active {
+    background-color: #134e67;
+}
+
+
 
 /* Removal Decision Modal */
 .modal-overlay {
@@ -1030,4 +1294,18 @@ body {
     overflow-y: auto;
     flex-grow: 1;
     background: #fff;
+}
+
+.loader {
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-left: 4px solid #3498db; /* Nice blue */
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
