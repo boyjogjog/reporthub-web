@@ -66,8 +66,9 @@ export default class WhiteboardManager {
             this._moveHighlighter();
         });
 
-        this.editor.addEventListener('paste', () => {
+        this.editor.addEventListener('paste', (e) => {
             this._setDirty(true);
+            this._handlePaste(e);
             setTimeout(() => this._moveHighlighter(), 0);
         });
 
@@ -765,6 +766,41 @@ export default class WhiteboardManager {
         const options = { year: 'numeric', month: 'short', day: 'numeric' };
         return new Date(dateStr).toLocaleDateString(undefined, options);
     }
+
+    _handlePaste(e) {
+    e.preventDefault();
+    this._setDirty(true);
+
+    // Get plain text only (strips <div>, <p>, etc.)
+    const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+
+    // Get the current selection
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+
+    // We want to make sure we are pasting into the .item-text span
+    let target = selection.anchorNode;
+    
+    // If the cursor is in the LI but not the span, move it to the span
+    if (target.nodeName === 'LI') {
+        target = target.querySelector('.item-text');
+    } else if (target.nodeType === 3) { // Text node
+        target = target.parentElement;
+    }
+
+    // Insert the plain text at the cursor position
+    const range = selection.getRangeAt(0);
+    range.deleteFromDocument();
+    const textNode = document.createTextNode(text);
+    range.insertNode(textNode);
+
+    // Move cursor to the end of the pasted text
+    range.setStartAfter(textNode);
+    range.setEndAfter(textNode);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
 
     showSnackbar(message) {
         const snack = document.getElementById("snackbar");
