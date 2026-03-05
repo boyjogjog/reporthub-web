@@ -771,35 +771,57 @@ export default class WhiteboardManager {
     e.preventDefault();
     this._setDirty(true);
 
-    // Get plain text only (strips <div>, <p>, etc.)
-    const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+    // 1. Get plain text (prevents the 'next line' <div> issue)
+    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
 
-    // Get the current selection
+    // 2. Get the current selection
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
 
-    // We want to make sure we are pasting into the .item-text span
-    let target = selection.anchorNode;
-    
-    // If the cursor is in the LI but not the span, move it to the span
-    if (target.nodeName === 'LI') {
-        target = target.querySelector('.item-text');
-    } else if (target.nodeType === 3) { // Text node
-        target = target.parentElement;
+    // --- FIX HERE: selection.deleteFromDocument(), NOT range ---
+    selection.deleteFromDocument(); 
+
+    // 3. Get the range (the exact spot where the cursor is)
+    const range = selection.getRangeAt(0);
+
+    // 4. Create the new text node
+    const textNode = document.createTextNode(text);
+
+    // 5. SAFETY CHECK: Ensure we stay inside the .item-text span
+    let container = range.commonAncestorContainer;
+    if (container.nodeType === 3) container = container.parentNode;
+
+    // If for some reason the cursor is outside the span, force it back in
+    if (!container.classList.contains('item-text') && this.activeLi) {
+        const span = this.activeLi.querySelector('.item-text');
+        if (span) {
+            span.appendChild(textNode);
+            this._moveCursorToEnd(span, selection);
+            return;
+        }
     }
 
-    // Insert the plain text at the cursor position
-    const range = selection.getRangeAt(0);
-    range.deleteFromDocument();
-    const textNode = document.createTextNode(text);
+    // 6. Insert the text exactly where the cursor was
     range.insertNode(textNode);
 
-    // Move cursor to the end of the pasted text
+    // 7. Move the blinking cursor to the end of what was just pasted
     range.setStartAfter(textNode);
     range.setEndAfter(textNode);
     selection.removeAllRanges();
     selection.addRange(range);
+
+    this._moveHighlighter();
 }
+
+/** Helper to keep the cursor in the right spot **/
+_moveCursorToEnd(el, selection) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
 
 
     showSnackbar(message) {
